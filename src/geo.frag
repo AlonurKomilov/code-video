@@ -21,6 +21,7 @@ uniform float uScene;  // 0 the empty field, 1 the street
 uniform float uCell;   // how tightly the street is packed -- for the cost experiment
 uniform float uNbr;
 uniform float uProbe;   // 1: map() calls   2: primitive evaluations
+uniform float uWalkDir;  // +1 the world comes to him, -1 the known-bad
 uniform float uRimGate; // 1 a floor has no silhouette, 0 the old ungated rim
 uniform float uBound;   // 1: use the cheap bounds  0: the known-bad, to measure them
 int MAPC=0, PRIMC=0;
@@ -85,7 +86,17 @@ float h11(float n){return fract(sin(n*127.1)*43758.5453);}
    the nearest surface may be in the NEXT cell. Evaluating the neighbours restores
    it -- skip that and rays tunnel straight through the walls. */
 vec2 mapEnv(vec3 p){
- vec3 q=p-vec3(iDist,0.0,0.0);
+ /* HE WALKS INTO THE STREET, SO THE STREET COMES TO HIM. With a minus here a
+    building at fold coordinate X drew at p.x = X + dist: every feature moved FURTHER
+    away as he walked, and measured that way -- 1.23 units of walking pushed a
+    building from 24.35 to 25.91 units off. The exposure sheet had the opposite
+    convention all along (foot-plant computes the foot's world x as local + travel,
+    i.e. the character advancing in +x), so the planted foot was sliding at double
+    rate too. Neither showed up, because foot-plant is arithmetic on the sheet and
+    never looks at a pixel, and nothing else asked which way the world goes.
+    uWalkDir -1 puts it back the way it was, so the check below has something to
+    fail against. */
+ vec3 q=p+uWalkDir*vec3(iDist,0.0,0.0);
  float d,m;
  /* ground: the road is flatter and darker than the snow either side of it.
     The drift noise is only worth computing NEAR the surface -- higher up, the plane
@@ -313,7 +324,17 @@ void main(){
  /* windows are a decision made ONCE, at the hit, from the point itself -- carving
     them into the field would cost every step of every ray for the same picture */
  if(mat>10.5&&mat<11.5){
-  vec3 q=p-vec3(iDist,0.0,0.0);   // the wall grid travels with the world, not the camera
+  /* HE WALKS INTO THE STREET, SO THE STREET COMES TO HIM. With a minus here a
+    building at fold coordinate X drew at p.x = X + dist: every feature moved FURTHER
+    away as he walked, and measured that way -- 1.23 units of walking pushed a
+    building from 24.35 to 25.91 units off. The exposure sheet had the opposite
+    convention all along (foot-plant computes the foot's world x as local + travel,
+    i.e. the character advancing in +x), so the planted foot was sliding at double
+    rate too. Neither showed up, because foot-plant is arithmetic on the sheet and
+    never looks at a pixel, and nothing else asked which way the world goes.
+    uWalkDir -1 puts it back the way it was, so the check below has something to
+    fail against. */
+ vec3 q=p+uWalkDir*vec3(iDist,0.0,0.0);   // the wall grid travels with the world, not the camera
   /* which pair of axes the grid runs in depends on WHICH FACE we hit: use the same
      pair on every face and the windows smear into bands down the sides. */
   vec3 an=abs(n);

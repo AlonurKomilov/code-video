@@ -20,19 +20,27 @@ const mean=a=>a.length? a.reduce((x,y)=>x+y,0)/a.length : null;
 const streetF=Math.round((STARTS[0]+1.5)*FPS);
 const walkF  =Math.round((STARTS[1]+0.6)*FPS);
 
-/* best horizontal shift between two strips, by plain correlation */
-function shiftOf(a,b,y0,y1,maxS=14){
- let best=0,bestScore=Infinity;
- for(let s=-maxS;s<=maxS;s++){
-  let e=0,n=0;
-  for(let y=y0;y<y1;y++)for(let x=maxS;x<W-maxS;x++){
-   const d=lum(a,y*W+x)-lum(b,y*W+x+s); e+=d*d; n++;
-  }
-  if(e/n<bestScore){bestScore=e/n;best=s;}
- }
- return best;
+/* GROUND ONLY, AND AS A DIFFERENCE RATHER THAN A SHIFT. Two earlier versions of the
+   next check were blind in two different ways. Correlating whole frames of the empty
+   field looked like a ground check and was not one: the snow there carries almost no
+   tone, so the only thing with contrast in the strip was the man, and the correlator
+   tracked HIM -- 0 inside a held drawing and 10px across a change, both true of the
+   drawing and neither about the ground. Moving it to the street fixed the texture and
+   broke the geometry: every street camera looks ALONG the street, so the world slides
+   down the view axis and a horizontal correlator sees nothing move either way.
+   What the check actually claims is simpler than a shift: inside a held drawing the
+   ground does not change, and across a change it does. Freeze the weather, because
+   flakes land on the ground too and they fall on every frame whatever the sheet says. */
+async function groundChanged(f0,f1){
+ const A=await pixels(f0,W,H,{snow:0}), B=await pixels(f1,W,H,{snow:0});
+ const ma=await pixels(f0,W,H,{},1);
+ let n=0,tot=0;
+ for(let i=0;i<W*H;i++){ const m=matOf(ma[i*4]); if(m!==10&&m!==14) continue;
+  tot++; if(Math.abs(lum(A,i)-lum(B,i))>4) n++; }
+ if(tot<3000) throw new Error('not enough ground in frame');
+ return 100*n/tot;
 }
-/* ASK THE FILM WHICH DRAWING IS UP. The first version of the next check worked the
+/* ASK THE FILM WHICH DRAWING IS UP. The first version of the check below worked the
    exposure index out again from the shot start, and got a different answer, because
    the walk phase accumulates across every shot that walks and not from the cut. Both
    the measurement and its calibration landed inside a hold, so the check reported
@@ -46,21 +54,53 @@ async function pairs(f0){
   if(cur.idx!==prev.idx && !cut)  cut =[f0+i-1,f0+i];
   prev=cur;
  }
+ if(!held||!cut) throw new Error('no held pair and no drawing change within 26 frames');
  return {held,cut};
 }
-const P=await pairs(walkF);
+const P=await pairs(streetF);
 
 /* THE WORLD MOVES WHEN THE DRAWING MOVES, AND NOT BETWEEN. That is the whole reason
    the planted foot does not slide, and it is visible in the ground itself. */
-await check({name:'world/ground-holds', unit:'px drift inside one drawing',
- measure:async()=>{
-  const A=await pixels(P.held[0],W,H), B=await pixels(P.held[1],W,H);
-  return Math.abs(shiftOf(A,B,4,Math.round(H*0.38)));},
- pass:v=>v===0,
- calibrate:async()=>{
-  const A=await pixels(P.cut[0],W,H), B=await pixels(P.cut[1],W,H);
-  return Math.abs(shiftOf(A,B,4,Math.round(H*0.38)));},
+await check({name:'world/ground-holds', unit:'% of ground changed in one drawing',
+ measure:()=>groundChanged(P.held[0],P.held[1]),
+ pass:v=>v<0.4,
+ calibrate:()=>groundChanged(P.cut[0],P.cut[1]),
  note:'the ground is still while a drawing is held and jumps when it changes — that IS the plant'});
+
+/* ===== AND IT HAS TO MOVE THE RIGHT WAY =====
+   It did not. A building at fold coordinate X drew at p.x = X + dist, so every
+   feature in the world moved FURTHER off as he walked: 1.23 units of walking pushed
+   a tracked building from 24.35 to 25.91 units away. He was walking down a street
+   that was running away from him, for the whole life of the project.
+
+   The exposure sheet had the opposite convention the whole time -- foot-plant works
+   the foot's world x out as local + travel, the character advancing in +x -- so the
+   planted foot was sliding at double rate as well. Neither was caught, because
+   foot-plant is arithmetic on the sheet and never looks at a pixel, and no check
+   asked which way the world goes. This is that check. */
+async function approachRate(opt){
+ const pts=[];
+ for(const f of [12,28,44,60]){
+  const st=await state(f,W,H);
+  /* one building every forty units instead of every three, so the same building is
+     still the same building at the end of the measurement */
+  const dep=await pixels(f,W,H,{...opt,cell:40},4), mat=await pixels(f,W,H,{...opt,cell:40},1);
+  let s=0,n=0;
+  for(let i=0;i<W*H;i++){ const m=matOf(mat[i*4]); if(m!==11&&m!==13) continue;
+   s+=dep[i*4]/255*60; n++; }
+  if(n<2000) throw new Error('not enough building in frame');
+  pts.push([st.di, s/n]);
+ }
+ const mx=mean(pts.map(p=>p[0])), my=mean(pts.map(p=>p[1]));
+ let num=0,den=0;
+ for(const [x,y] of pts){ num+=(x-mx)*(y-my); den+=(x-mx)*(x-mx); }
+ return -num/den;              // metres nearer per metre walked; negative means it flees
+}
+await check({name:'world/street-approaches', unit:'units nearer per unit walked',
+ measure:()=>approachRate({}),
+ pass:v=>v>0.5,
+ calibrate:()=>approachRate({wdir:-1}),    // the film as it was: he walks, the city retreats
+ note:'he walks into the street, so the street has to come to him'});
 
 /* DISTANCE HAS TO BEHAVE LIKE DISTANCE. Binning wall tone by depth mixed the weather
    up with which way a wall faces, and called a working haze broken. Rendering the
