@@ -1,0 +1,62 @@
+{
+  "name": "hooded-walker",
+  "note": "The figure is data. Nothing below is code: a part names two joints, a radius and how it joins, and the builder writes the shader.",
+  "materials": {
+    "coat":  {"id": 1, "ramp": [[0.052,0.058,0.078],[0.116,0.126,0.156],[0.215,0.230,0.272]]},
+    "boot":  {"id": 2, "ramp": [[0.036,0.040,0.054],[0.082,0.089,0.108],[0.158,0.168,0.194]]},
+    "skin":  {"id": 3, "ramp": [[0.200,0.160,0.142],[0.345,0.284,0.252],[0.520,0.440,0.394]]},
+    "blade": {"id": 4, "ramp": [[0.290,0.302,0.330],[0.530,0.547,0.580],[0.820,0.838,0.866]]},
+    "skirt": {"id": 5, "ramp": [[0.078,0.086,0.112],[0.165,0.178,0.214],[0.292,0.310,0.356]]},
+    "cloak": {"id": 6, "ramp": [[0.040,0.046,0.062],[0.094,0.103,0.128],[0.186,0.199,0.234]]}
+  },
+  "body": {
+    "mat": "coat",
+    "of": [
+      { "note":"pelvis", "ellip": [{"p":"hip","add":[0,0.02,0]}, [0.075,0.070,0.090]] },
+      { "note":"ribcage", "joinK":0.055,
+        "ellip": [{"mix":["hip","shoulder",0.55],"add":[0.012,0.01,0]}, [0.086,0.105,0.100]] },
+      { "note":"neck and scarf", "joinK":0.040, "k":0.022, "smin":[
+        { "cone": ["shoulder","neck",0.038,0.030] },
+        { "ellip": [{"mix":["neck","shoulder",0.30],"add":[0.006,0,0]}, [0.050,0.032,0.056]] }]},
+      { "note":"near leg", "joinK":0.045, "k":0.030, "smin":[
+        { "cone": [{"p":"hip","add":[0,0,0.045]}, "knee.n", 0.062,0.046] },
+        { "cone": ["knee.n","ankle.n",0.047,0.032] }]},
+      { "note":"far leg", "joinK":0.045, "k":0.030, "smin":[
+        { "cone": [{"p":"hip","add":[0,0,-0.045]}, "knee.f", 0.058,0.043] },
+        { "cone": ["knee.f","ankle.f",0.044,0.030] }]},
+      { "note":"near arm", "joinK":0.038, "k":0.026, "smin":[
+        { "cone": [{"p":"shoulder","add":[0,0,0.075]}, "elbow.n", 0.046,0.034] },
+        { "cone": ["elbow.n","hand.n",0.035,0.026] }]},
+      { "note":"far arm", "joinK":0.038, "k":0.026, "smin":[
+        { "cone": [{"p":"shoulder","add":[0,0,-0.075]}, "elbow.f", 0.043,0.032] },
+        { "cone": ["elbow.f","hand.f",0.033,0.024] }]},
+      { "note":"coat shoulders: the hard horizontal top a body does not have", "joinK":0.040,
+        "ellip": [{"p":"shoulder","add":[0.004,0.012,0]}, [0.070,0.052,0.128]] }
+    ]
+  },
+  "over": [
+    { "mat":"skirt", "note":"two long panels, hard-edged so the legs read between them",
+      "min":[
+        { "sheet":[{"p":"hip","add":[0.006,0.014,0.062]},
+                   {"axes":[{"mix":["hip","knee.n",0.30],"a":"x","add":-0.022},
+                            {"j":"hip","a":"y","add":-0.215}, 0.086]}, 0.052,0.076,1.15,0.26] },
+        { "sheet":[{"p":"hip","add":[0.006,0.014,-0.062]},
+                   {"axes":[{"mix":["hip","knee.f",0.30],"a":"x","add":-0.022},
+                            {"j":"hip","a":"y","add":-0.215}, -0.086]}, 0.052,0.076,1.15,0.26] }]},
+    { "mat":"cloak", "note":"a sheet: thin front to back, wide across, flaring to the hem",
+      "k":0.045, "smin":[
+        { "sheet":[{"p":"shoulder","add":[-0.020,0.020,0]}, {"p":"cloak.mid","add":[-0.016,0,0]}, 0.052,0.088,0.34,1.45] },
+        { "sheet":[{"p":"cloak.mid","add":[-0.016,0,0]}, "cloak.hem", 0.088,0.150,0.30,1.55] }]},
+    { "mat":"boot", "min":[
+        { "cone":["ankle.n","toe.n",0.041,0.031] },
+        { "cone":["ankle.f","toe.f",0.039,0.029] }]},
+    { "mat":"skin", "note":"the face, inside the hood",
+      "ellip":["head",[0.053,0.059,0.050]] },
+    { "mat":"coat", "note":"the hood: a shell with the face opening cut out, sitting on the shoulders",
+      "min":[
+        { "sub":[
+          { "ellip":[{"p":"head","add":[-0.010,0.007,0]}, [0.070,0.074,0.066]] },
+          { "ellip":[{"p":"head","add":[0.064,-0.006,0]}, [0.052,0.046,0.044]] }]},
+        { "cone":["neck",{"p":"head","add":[-0.02,-0.04,0]},0.050,0.062] }]}
+  ]
+}

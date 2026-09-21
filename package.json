@@ -1,0 +1,13 @@
+{
+  "name": "qalam",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A character is a document, a street is forty lines, and every check ships with the case that proves it works.",
+  "scripts": {
+    "build": "node tools/build.mjs src/characters/hooded-walker.json src/characters/plated-guard.json build/film.frag && python3 tools/mkfilm.py",
+    "audit": "node test/run.mjs",
+    "audit:fast": "node test/run.mjs --no-browser"
+  },
+  "devDependencies": { "playwright": "^1.47.0" }
+}
