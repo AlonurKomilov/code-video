@@ -19,7 +19,7 @@ export async function open(){
  /* SwiftShader, so the audit runs on a build machine with no GPU at all. It is slow
     and that is fine: nothing here is measured in absolute milliseconds except the
     cost check, which is a ratio against itself. */
- const args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'];
+ const args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--autoplay-policy=no-user-gesture-required'];
  const exe=process.env.QALAM_CHROME || findChrome();
  browser=await chromium.launch(exe?{args,executablePath:exe}:{args});
  page=await browser.newPage({viewport:{width:820,height:1000}});
@@ -32,6 +32,7 @@ export async function open(){
  return page;
 }
 export async function close(){ if(browser) await browser.close(); browser=page=null; }
+process.on("exit",()=>{ try{ browser&&browser.close(); }catch(e){} });
 /* pixels of one frame, rendered deterministically */
 export async function pixels(frame,w,h,opt={},mode=0){   // 0 picture 1 material 2 line 3 work
  const pg=await open();

@@ -88,4 +88,4 @@ for(let i=0;i<SHOTS.length;i++){
   calibrate:()=>area({cam:{ro:[sh.ro[0],sh.ro[1]+9,sh.ro[2]],ta:[sh.ta[0],sh.ta[1]+9,sh.ta[2]],foc:sh.foc}}),
   note:i===0?'counting DARK pixels scored an empty shot higher than a framed one — a wall is darker than two men':undefined});
 }
-await close();
+

@@ -52,6 +52,7 @@ HEAD=r'''<title>Oq Ko'cha</title>
  <div class="bar">
   <button id="play" aria-pressed="true">Pauza</button>
   <button id="rew">Boshidan</button>
+  <button id="snd" aria-pressed="false">Ovoz</button>
   <span>sifat</span>
   <button id="qa" aria-pressed="true">avto</button><button id="q0">past</button><button id="q1">o'rta</button><button id="q2">to'liq</button>
   <span id="q">—</span>
@@ -61,6 +62,7 @@ HEAD=r'''<title>Oq Ko'cha</title>
   <dt>Oraliq</dt><dd id="s2">—</dd>
   <dt>Ruxsat</dt><dd id="s3">—</dd>
   <dt>Grafika</dt><dd id="s4">—</dd>
+  <dt>Ovoz</dt><dd id="s5">o'chiq — sintez, 0 bayt namuna</dd>
  </dl>
  <p class="note">Ruxsat <em>o'zini boshqaradi</em>: kadr oralig'i 22 ms dan oshsa
   tushadi, 12 ms dan tushsa ko'tariladi. Shuning uchun bu sahifa telefonda ham,
@@ -71,6 +73,7 @@ HEAD=r'''<title>Oq Ko'cha</title>
 <script id="fs-geo" type="x-shader/x-fragment">__G__</script>
 <script id="fs-comp" type="x-shader/x-fragment">__C__</script>
 <script>
+__SOUND__
 const POSES=__POSES__, RAMP=new Float32Array(__RAMP__);
 __SHEET__
 const NZ=-0.048,FZ=0.048;
@@ -165,9 +168,61 @@ function adapt(ms){
 }
 const JA=new Float32Array(48), JB=new Float32Array(48);
 let T=0,phA=0,phB=0.37,dist=0,frameNo=0,playing=true,last=performance.now(),ft=16,DBG=0;
+/* AUDIO. Off until asked, because a page that makes noise on its own is rude and
+   because the browser will not allow it anyway. When it IS on, the film's clock is
+   taken FROM the audio context -- otherwise the picture drifts off the footsteps
+   over fourteen seconds and the one thing worth getting right is lost. */
+let AC=null,BUS=null,BEDS=null,V=null,NOISE=null,CRUNCH=null,audioOn=false,loopBase=0,lastShot=-1;
+function startAudio(){
+ if(AC) return;
+ AC=new (window.AudioContext||window.webkitAudioContext)();
+ NOISE=noiseBuffer(AC,3);
+ CRUNCH=[0,1,2,3,4,5,6,7].map(i=>crunchBuffer(AC,i+1,0.14+i*0.012,i/7));
+ BUS=buildBus(AC); BEDS=buildBeds(AC,BUS.master,NOISE); V=makeVoices(AC,BUS.master,NOISE,CRUNCH);
+ loopBase=AC.currentTime+0.12; scheduleLoop(loopBase); lastShot=-1;
+ audioOn=true;
+ document.getElementById('s5').textContent="yoqilgan — sintez, 0 bayt namuna";
+}
+function scheduleLoop(base){
+ for(const e of TIMELINE){
+  const t=base+e.t;
+  if(e.type==='step') V.step(t,e.g,e.x,e.sz);
+  else if(e.type==='cloth') V.cloth(t,e.g,e.x);
+  else if(e.type==='breath') V.breath(t,e.g);
+  else if(e.type==='metal') V.metal(t,e.g,e.x);
+ }
+}
 /* every knob the audit needs to break the picture on purpose, in one place */
 const OPT={lines:1,nbr:1,cell:0,cam:null,bound:1};
 function shotAt(t){let i=0;for(let j=0;j<SHOTS.length;j++)if(t>=S[j])i=j;return i;}
+
+/* ===== THE SOUND TIMELINE =====
+   Built once, by simulating the film exactly as it plays. A footfall is emitted on
+   the frame the drawing changes TO a contact -- the same event the snow spray comes
+   from -- so the sound cannot drift from the picture: they are the same decision. */
+function buildTimeline(){
+ const ev=[]; let t=0,a=0,b=0.37,ia=-1,ib=-1,breath=0.9;
+ const n=Math.round(TOTAL*FPS);
+ for(let f=0;f<n;f++){
+  const i=shotAt(t), sh=SHOTS[i], m=1-(sh.snd.mute||0);
+  /* the phase is advanced BEFORE the index is read, so the drawing that has just
+     come up belongs to the NEXT frame -- emitting at t puts the sound one frame,
+     forty-two milliseconds, ahead of the foot that made it. */
+  const te=t+DT;
+  if(sh.aw){ a+=DT/CYCLE; const k=idxAt(a);
+   if(k!==ia){ if(k===0||k===4) ev.push({t:te,type:'step',who:'a',g:0.52*m,x:-0.12,sz:1.0}); ia=k; } }
+  if(sh.bw){ b+=DT/CYCLE; const k=idxAt(b);
+   if(k!==ib){ if(k===0||k===4) ev.push({t:te,type:'step',who:'b',g:0.40*m,x:0.30,sz:0.86}); ib=k; }
+   if(f%17===0) ev.push({t:te,type:'metal',g:0.045*m,x:0.32}); }
+  breath-=DT;
+  if(breath<=0){ breath=1.9+((f*0.37)%0.8);
+   ev.push({t,type:'breath',g:(0.085+0.10*(sh.snd.mute||0))*m}); }
+  if(f%29===0 && (sh.aw||sh.bw)) ev.push({t,type:'cloth',g:0.075*m,x:-0.08});
+  t+=DT;
+ }
+ return ev;
+}
+const TIMELINE=buildTimeline();
 function render(){
  const i=shotAt(T), sh=SHOTS[i], lt=T-S[i], u=Math.min(lt/sh.d,1);
  fb(c.width,c.height);
@@ -209,16 +264,28 @@ function step(dt){
  T+=dt; frameNo++;
  if(sh.aw){const p0=phA; phA+=dt/CYCLE; dist+=travel(phA)-travel(p0);}
  if(sh.bw) phB+=dt/CYCLE;
- if(T>=TOTAL){T=0;phA=0;phB=0.37;dist=0;}
+ if(T>=TOTAL){T=0;phA=0;phB=0.37;dist=0;frameNo=0;}
 }
 let acc=0;
 function frame(now){
  const raw=Math.min(0.1,Math.max(0,(now-last)/1000)); last=now;
  ft=ft*0.88+raw*1000*0.12;
- if(playing){acc+=raw; while(acc>=DT){step(DT);acc-=DT;}}
+ if(playing){
+  if(audioOn&&AC){
+   /* the picture follows the sound, not the other way round */
+   let at=AC.currentTime-loopBase;
+   if(at>=TOTAL){ loopBase+=TOTAL; scheduleLoop(loopBase); at-=TOTAL; }
+   if(at<0) at=0;
+   const want=Math.floor(at*FPS);
+   let guard=0;
+   while(frameNo<want && guard++<240) step(DT);
+   if(frameNo>want+2){ T=0;phA=0;phB=0.37;dist=0;frameNo=0; }
+  } else { acc+=raw; while(acc>=DT){step(DT);acc-=DT;} }
+ }
  const i=render();
  adapt(ft);
  const sh=SHOTS[i];
+ if(audioOn&&AC&&i!==lastShot){ BEDS.set(sh.snd.wind, sh.snd.city, AC.currentTime, 0.18); lastShot=i; }
  hud.textContent=(i+1)+'/'+SHOTS.length+'  '+sh.k;
  s1.textContent=(i+1)+' — '+sh.k+'  ·  '+sh.d.toFixed(1)+' s  ·  o‘lcham '+sh.sz.toFixed(1)+'x';
  s2.textContent=ft.toFixed(1)+' ms  ·  '+(1000/Math.max(ft,0.001)).toFixed(0)+' fps';
@@ -245,9 +312,40 @@ document.getElementById('qa').onclick=()=>{setQ(-1);settle=0;};
 [0,1,2].forEach(v=>{document.getElementById('q'+v).onclick=()=>setQ(v);});
 const pl=document.getElementById('play');
 pl.onclick=()=>{playing=!playing;pl.textContent=playing?'Pauza':'Davom';pl.setAttribute('aria-pressed',playing);};
-document.getElementById('rew').onclick=()=>{T=0;phA=0;phB=0.37;dist=0;acc=0;};
+document.getElementById('rew').onclick=()=>{T=0;phA=0;phB=0.37;dist=0;acc=0;frameNo=0;
+ if(AC){loopBase=AC.currentTime+0.1;scheduleLoop(loopBase);lastShot=-1;}};
+const sb=document.getElementById('snd');
+sb.onclick=()=>{
+ if(!AC){ startAudio(); sb.setAttribute('aria-pressed','true'); return; }
+ if(AC.state==='running'){ AC.suspend(); audioOn=false; sb.setAttribute('aria-pressed','false');
+  document.getElementById('s5').textContent="o'chiq — sintez, 0 bayt namuna"; }
+ else { AC.resume(); audioOn=true; loopBase=AC.currentTime-T; sb.setAttribute('aria-pressed','true');
+  document.getElementById('s5').textContent="yoqilgan — sintez, 0 bayt namuna"; }
+};
 /* deterministic access, for the audit */
 window.__total=TOTAL; window.__fps=FPS; window.__shots=SHOTS.map(s=>({k:s.k,d:s.d,sz:s.sz}));
+window.__timeline=()=>TIMELINE;
+/* the same graph, rendered offline, so the sound can be MEASURED rather than liked */
+window.__renderAudio=async(seconds,sr)=>{
+ const oc=new OfflineAudioContext(2, Math.floor((sr||32000)*seconds), sr||32000);
+ const nz=noiseBuffer(oc,3);
+ const cr=[0,1,2,3,4,5,6,7].map(i=>crunchBuffer(oc,i+1,0.14+i*0.012,i/7));
+ const bus=buildBus(oc), beds=buildBeds(oc,bus.master,nz), v=makeVoices(oc,bus.master,nz,cr);
+ let last=-1;
+ for(let f=0;f<Math.round(seconds*FPS);f++){
+  const t=f/FPS, i=shotAt(t%TOTAL);
+  if(i!==last){ beds.set(SHOTS[i].snd.wind,SHOTS[i].snd.city,t,0.18); last=i; }
+ }
+ for(const e of TIMELINE){ if(e.t>=seconds) continue;
+  if(e.type==='step') v.step(e.t,e.g,e.x,e.sz);
+  else if(e.type==='cloth') v.cloth(e.t,e.g,e.x);
+  else if(e.type==='breath') v.breath(e.t,e.g);
+  else if(e.type==='metal') v.metal(e.t,e.g,e.x); }
+ const b=await oc.startRendering();
+ const L=b.getChannelData(0), Rc=b.getChannelData(1), out=new Float32Array(L.length);
+ for(let i=0;i<L.length;i++) out[i]=(L[i]+Rc[i])*0.5;
+ return {sr:b.sampleRate, pcm:Array.from(out)};
+};
 /* OCCUPANCY HAS TO BE MEASURED ON THE CHARACTER, NOT ON DARKNESS. The first version
    of this counted dark pixels, and a shot that had lost both men to a dark building
    wall scored HIGHER than the shot that framed them. The material buffer knows the
@@ -271,6 +369,7 @@ window.__frameTo=(n,w,h)=>{
 # the sheet block also carried the WALK declaration away with it; put it back
 HEAD=HEAD.replace('__SHEET__', mod('sheet.mjs') + '\nconst WALK=walkFrom(POSES.PW);')
 HEAD=HEAD.replace('__SHOTS__', mod('shots.mjs'))
+HEAD=HEAD.replace('__SOUND__', mod('sound.mjs'))
 out=(HEAD.replace('__G__',G).replace('__C__',C)
    .replace('__POSES__',json.dumps(P)).replace('__RAMP__',json.dumps(flat)))
 os.makedirs(os.path.join(ROOT,'build'),exist_ok=True)
