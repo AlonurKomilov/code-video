@@ -103,12 +103,19 @@ if(args.length){
   ' vec3 pa=p-uPosA;',
   ' float ba=length(pa-FIG_C)-FIG_R;',
   ` bool fa=(uBound<0.5)||ba<=0.04; PRIMC+=fa?40:1;`,
-  ` vec2 a = fa ? ${nm(chars[0])}(pa, JA) : vec2(ba,1.0);`,
+  /* A BOUND IS NOT A DISTANCE, AND IT HAS TO SAY SO. Outside the shell this returns
+     the distance to the SHELL, which is a valid lower bound and all the marcher
+     needs -- but it is up to a third of a metre short of the truth, so the field
+     falls off a cliff at the shell. A soft shadow reads a cliff as a surface passing
+     close by, and the whole snow field was ringed with the shadow of a sphere that
+     is not in the picture. Material -1 marks the value as a bound: step by it,
+     never shade or shadow from it. */
+  ` vec2 a = fa ? ${nm(chars[0])}(pa, JA) : vec2(ba,-1.0);`,
   ' if(uTwo<0.5) return a;',
   ' vec3 q=p-uPosB; q.x=-q.x;              // mirrored: he faces the other way',
   ' float bb=length(q-FIG_C)-FIG_R;',
   ` bool fb=(uBound<0.5)||bb<=0.04; PRIMC+=fb?40:1;`,
-  ` vec2 b = fb ? ${nm(chars[1]||chars[0])}(q, JB) : vec2(bb,21.0);`,
+  ` vec2 b = fb ? ${nm(chars[1]||chars[0])}(q, JB) : vec2(bb,-1.0);`,
   ' return b.x<a.x? b : a;',
   '}'].join('\n');
  frag=frag.replace('//#CHARACTER_MAP',fns+'\n'+disp);

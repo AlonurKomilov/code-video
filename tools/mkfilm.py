@@ -122,10 +122,10 @@ const U=(p,n)=>gl.getUniformLocation(p,n);
 const G={p:gp,res:U(gp,'iRes'),t:U(gp,'iTime'),d:U(gp,'iDist'),sc:U(gp,'uScene'),
  JA:U(gp,'JA'),JB:U(gp,'JB'),pA:U(gp,'uPosA'),pB:U(gp,'uPosB'),two:U(gp,'uTwo'),
  ro:U(gp,'uRo'),ta:U(gp,'uTa'),foc:U(gp,'uFoc'),far:U(gp,'uFar'),
- cell:U(gp,'uCell'),nbr:U(gp,'uNbr'),probe:U(gp,'uProbe'),bound:U(gp,'uBound')};
+ cell:U(gp,'uCell'),nbr:U(gp,'uNbr'),probe:U(gp,'uProbe'),rimg:U(gp,'uRimGate'),bound:U(gp,'uBound')};
 const K={p:cp,res:U(cp,'iRes'),t:U(cp,'iTime'),sc:U(cp,'uScene'),ramp:U(cp,'RAMP'),
  gA:U(cp,'gA'),gB:U(cp,'gB'),lines:U(cp,'uLines'),dbg:U(cp,'uDebug'),
- ro:U(cp,'uRo'),ta:U(cp,'uTa'),foc:U(cp,'uFoc')};
+ ro:U(cp,'uRo'),ta:U(cp,'uTa'),foc:U(cp,'uFoc'),fog:U(cp,'uFog'),snow:U(cp,'uSnow'),rimo:U(cp,'uRimOld'),wmax:U(cp,'uWorkMax'),lfar:U(cp,'uLineFar')};
 let fbo=null,texA,texB,fw=0,fh=0;
 function fb(w,h){
  if(fw===w&&fh===h)return;
@@ -193,7 +193,7 @@ function scheduleLoop(base){
  }
 }
 /* every knob the audit needs to break the picture on purpose, in one place */
-const OPT={lines:1,nbr:1,cell:0,cam:null,bound:1};
+const OPT={lines:1,nbr:1,cell:0,cam:null,bound:1,fog:1,snow:1,lfar:1,rimg:1,wmax:4096};
 function shotAt(t){let i=0;for(let j=0;j<SHOTS.length;j++)if(t>=S[j])i=j;return i;}
 
 /* ===== THE SOUND TIMELINE =====
@@ -238,7 +238,7 @@ function render(){
  gl.uniform2f(G.res,c.width,c.height);
  gl.uniform1f(G.t,T); gl.uniform1f(G.d,dist); gl.uniform1f(G.sc,sh.sc);
  gl.uniform1f(G.two,sh.two); gl.uniform1f(G.cell,OPT.cell); gl.uniform1f(G.nbr,OPT.nbr);
- gl.uniform1f(G.probe,DBG===4?1:DBG===5?2:0); gl.uniform1f(G.bound,OPT.bound);
+ gl.uniform1f(G.probe,DBG===4?1:DBG===5?2:0); gl.uniform1f(G.bound,OPT.bound); gl.uniform1f(G.rimg,OPT.rimg);
  gl.uniform3f(G.pA,(sh.A?sh.A[0]:0)+ax,0,sh.A?sh.A[2]:0);
  gl.uniform3f(G.pB,bx,0,sh.B?sh.B[2]:0);
  gl.uniform3fv(G.JA,JA); gl.uniform3fv(G.JB,JB);
@@ -250,7 +250,7 @@ function render(){
  gl.viewport(0,0,c.width,c.height);
  gl.useProgram(K.p);
  gl.uniform2f(K.res,c.width,c.height); gl.uniform1f(K.t,T); gl.uniform1f(K.sc,sh.sc);
- gl.uniform1f(K.lines,OPT.lines); gl.uniform1f(K.dbg,DBG);
+ gl.uniform1f(K.lines,OPT.lines); gl.uniform1f(K.dbg,DBG); gl.uniform1f(K.fog,OPT.fog); gl.uniform1f(K.snow,OPT.snow); gl.uniform1f(K.lfar,OPT.lfar); gl.uniform1f(K.rimo,OPT.rimg); gl.uniform1f(K.wmax,OPT.wmax);
  gl.uniform3fv(K.ramp,RAMP);
  gl.uniform3f(K.ro,ro[0],ro[1],ro[2]); gl.uniform3f(K.ta,ta[0],ta[1],ta[2]);
  gl.uniform1f(K.foc,OPT.cam?OPT.cam.foc:sh.foc);
@@ -324,6 +324,7 @@ sb.onclick=()=>{
 };
 /* deterministic access, for the audit */
 window.__total=TOTAL; window.__fps=FPS; window.__shots=SHOTS.map(s=>({k:s.k,d:s.d,sz:s.sz}));
+window.__shotsRaw=SHOTS;   // the audit needs to perturb a camera to price it
 window.__timeline=()=>TIMELINE;
 /* the same graph, rendered offline, so the sound can be MEASURED rather than liked */
 window.__renderAudio=async(seconds,sr)=>{
@@ -355,14 +356,22 @@ window.__lineFrame=(n,w,h)=>{DBG=2;const r=window.__frameTo(n,w,h);DBG=0;return 
 /* WORK, not wall-clock: map() evaluations per pixel, exact and repeatable */
 window.__workFrame=(n,w,h)=>{DBG=4;const r=window.__frameTo(n,w,h);DBG=0;return r;};
 window.__primFrame=(n,w,h)=>{DBG=5;const r=window.__frameTo(n,w,h);DBG=0;return r;};
+window.__depthFrame=(n,w,h)=>{DBG=6;const r=window.__frameTo(n,w,h);DBG=0;return r;};
+window.__dbgFrame=(d,n,w,h)=>{DBG=d;const r=window.__frameTo(n,w,h);DBG=0;return r;};
 window.__opt=(o)=>{Object.assign(OPT,o);};
-window.__resetOpt=()=>{OPT.lines=1;OPT.nbr=1;OPT.cell=0;OPT.cam=null;OPT.bound=1;};
+window.__resetOpt=()=>{OPT.lines=1;OPT.nbr=1;OPT.cell=0;OPT.cam=null;OPT.bound=1;OPT.fog=1;OPT.snow=1;OPT.lfar=1;OPT.rimg=1;OPT.wmax=4096;};
 window.__frameTo=(n,w,h)=>{
  playing=false; T=0;phA=0;phB=0.37;dist=0;acc=0;
  if(w){c.width=w;c.height=h;}
  for(let i=0;i<n;i++)step(DT);
  const s=render(); gl.finish();
- return {frame:n,t:+T.toFixed(4),shot:SHOTS[s].k,size:SHOTS[s].sz};
+ /* THE FILM SAYS WHICH DRAWING IS UP. The first version of the ground check worked
+    the exposure index out again, from the shot start, and got a different answer,
+    because the walk phase accumulates across every shot that walks and not from the
+    cut. A check that recomputes what it is checking is checking its own arithmetic. */
+ const sh=SHOTS[s];
+ return {frame:n,t:+T.toFixed(4),shot:sh.k,size:sh.sz,
+         idx: sh.aw? idxAt(phA) : -1, di:+dist.toFixed(5)};
 };
 }
 </script>'''

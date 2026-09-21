@@ -66,11 +66,15 @@ await check({name:'line-art', unit:'ink valley, levels',
    exact, repeatable, and the same number on any machine. */
 await check({name:'bounds-save-work', unit:'x fewer primitive evals',
  measure:async()=>{
-  const prim=async(bound)=>{
-   const p=await pixels(209,W,H,{bound},3); let s=0;
-   for(let k=0;k<W*H;k++) s+=p[k*4];
-   return 4096*(s/(W*H))/255;};
-  return (await prim(0))/(await prim(1));},
+  /* A SATURATED PROBE IS NOT A MEASUREMENT. At 4096 full scale the unbounded render
+     pinned 38,458 of 41,520 pixels at white, so the ratio it reported was a floor:
+     whatever the saving really was, this could only ever say "at least". */
+  const prim=async(bound,wmax)=>{
+   const p=await pixels(209,W,H,{bound,wmax},3); let s=0,sat=0;
+   for(let k=0;k<W*H;k++){ s+=p[k*4]; if(p[k*4]>=255) sat++; }
+   if(sat>W*H*0.001) throw new Error(`work probe saturated on ${sat} pixels at ${wmax} full scale`);
+   return wmax*(s/(W*H))/255;};
+  return (await prim(0,32768))/(await prim(1,4096));},
  pass:v=>v>1.8,
  calibrate:async()=>1.0,          // bounds on both sides: by construction, no saving
  note:'a bounding sphere for the figure and a slab test for each terrace'});

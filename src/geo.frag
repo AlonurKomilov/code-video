@@ -21,8 +21,15 @@ uniform float uScene;  // 0 the empty field, 1 the street
 uniform float uCell;   // how tightly the street is packed -- for the cost experiment
 uniform float uNbr;
 uniform float uProbe;   // 1: map() calls   2: primitive evaluations
+uniform float uRimGate; // 1 a floor has no silhouette, 0 the old ungated rim
 uniform float uBound;   // 1: use the cheap bounds  0: the known-bad, to measure them
-int MAPC=0, PRIMC=0;    // 1 evaluate the neighbouring cells, 0 do not -- the known-bad case
+int MAPC=0, PRIMC=0;
+/* HOW WIDE IS ONE PIXEL, WHERE THIS RAY IS. A drift ridge every six centimetres is
+   the texture of wind on snow when a pixel is a centimetre across, and moire when a
+   pixel is half a metre across -- which is what a pixel IS at the bottom of a frame,
+   where the ground is a metre away but seen edge-on. Set once per march step, read
+   by the ground noise, which fades out whatever it can no longer resolve. */
+float GFP=0.002;    // 1 evaluate the neighbouring cells, 0 do not -- the known-bad case
 /* Joint indices: 0 hip 1 shoulder 2 head 3 neck
    near 4 knee 5 ankle 6 toe 7 elbow 8 hand
    far  9 knee 10 ankle 11 toe 12 elbow 13 hand
@@ -85,15 +92,37 @@ vec2 mapEnv(vec3 p){
     height minus the noise's own amplitude is already a valid bound. This runs at
     every step of every ray, so texturing ground forty units below the ray was a
     large part of the cost of every wide shot. */
- float road=smoothstep(1.55,1.15,abs(q.z-0.35));
+ /* A ROAD ONLY EXISTS WHERE THERE IS A STREET. This was ungated, so the empty snow
+    field had a two-and-a-half metre strip of asphalt running across it, sixty-four
+    levels darker than the snow, with a dead-straight edge -- and because the walk
+    shot is side-on, that edge ran level across the frame and read as the horizon.
+    It had been invisible for exactly as long as the rim term was erasing the ground
+    to white: two bugs, each hiding the other, and fixing one exposed the other. */
+ float road=uScene>0.5 ? smoothstep(1.55,1.15,abs(q.z-0.35)) : 0.0;
  float g;
  if(uBound>0.5 && p.y>0.34){ g=p.y-0.026; PRIMC+=1; }
  else{
   PRIMC+=5;
   vec2 w=vec2(q.x*0.40+q.z*0.92, q.z*0.40-q.x*0.92);
-  g=p.y + mix(vnoise(w*vec2(2.2,15.0))*0.016+vnoise(w*vec2(7.0,44.0))*0.005,
-              vnoise(q.xz*vec2(3.0,9.0))*0.004, road)
-        + vnoise(q.xz*70.0)*0.0016;
+  /* a term whose period is smaller than the pixel cannot be drawn, only aliased */
+  float f15=exp(-GFP*5.0*11.0), f44=exp(-GFP*16.0*11.0), f70=exp(-GFP*70.0*11.0);
+  /* AMPLITUDE IS NOT THE SLOPE. 1.6cm of relief with a 6.7cm period is a 45-degree
+     face every six centimetres -- a washboard, not a drift -- and under a quantiser
+     that turns into hard contour arcs converging on the vanishing point, which is
+     the corduroy this ground used to be made of. Wind-packed snow is long and low:
+     the same relief, spread over three times the distance. */
+  float rel = mix(vnoise(w*vec2(1.6,5.0))*0.017*f15+vnoise(w*vec2(5.0,16.0))*0.0045*f44,
+                  vnoise(q.xz*vec2(2.4,6.0))*0.0035*f15, road)
+            + vnoise(q.xz*70.0)*0.0016*f70;
+  /* AND IT HAS TO MEET THE BOUND. The cheap bound above is a LOWER bound, which is
+     all the primary marcher needs -- but at p.y=0.34 the field stepped down by up to
+     47mm in no distance at all, and a soft shadow reads a step in the field as a
+     surface passing close by. Every shadow ray on the field crosses that height at
+     the same moment, so the whole near ground was stippled with a picture of the
+     drift, taken at the gate. Fading the relief into the bound over the last 18cm
+     costs nothing where the saving was -- a ray forty units up still skips it. */
+  float fade = uBound>0.5 ? smoothstep(0.34,0.16,p.y) : 1.0;
+  g = p.y - 0.026 + fade*(rel + 0.026);
  }
  d=g; m=mix(10.0,14.0,step(0.5,road));
 
@@ -106,7 +135,7 @@ vec2 mapEnv(vec3 p){
    /* the row lives in a slab; the distance to the slab is a valid bound for every
       building in it, so a ray far from the row never opens the cell loop */
    float slab=max(abs(q.z-zc)-1.9*sc, q.y-7.1*sc);
-   if(uBound>0.5 && slab>0.75){ d=min(d,slab); PRIMC+=1; continue; }
+   if(uBound>0.5 && slab>0.75){ if(slab<d){d=slab;m=-1.0;} PRIMC+=1; continue; }
    float id0=floor((q.x+float(row)*1.7)/CELL);
    int kk=uNbr>0.5?1:0;
    for(int k=-kk;k<=kk;k++){                      // the neighbours, or rays tunnel through
@@ -153,12 +182,35 @@ vec3 calcN(vec3 p){
  return normalize(e.xyy*map(p+e.xyy).x + e.yyx*map(p+e.yyx).x +
                   e.yxy*map(p+e.yxy).x + e.xxx*map(p+e.xxx).x);
 }
+/* A SOFT SHADOW THAT DOES NOT RING. Taking k*h/t at each sample asks "how close did
+   the ray pass, at this sample", and the samples are laid down by the marcher itself,
+   so wherever the step pattern shifts the penumbra jumps with it -- concentric rings
+   around every occluder, and on a snow field with nothing else in it they were the
+   most visible thing in the shot. Inigo Quilez's correction estimates the closest
+   approach of the SEGMENT between two samples instead of at them, which removes the
+   dependence on where the samples happened to land. Same cost, same loop. */
 float shadow(vec3 ro, vec3 rd, float k){
- float res=1.0,t=0.05;
- for(int i=0;i<22;i++){
-  float h=map(ro+rd*t).x;
-  res=min(res,k*h/t); if(res<0.02||t>2.2)break;
-  t+=clamp(h,0.012,0.22);
+ float res=1.0,t=0.05,ph=1e20;
+ for(int i=0;i<34;i++){
+  vec2 mh=map(ro+rd*t); float h=mh.x;
+  bool real = mh.y>-0.5;                 // false: this sample is a bound, not a surface
+  if(real && h<0.0015) return 0.0;
+  /* AND THE CORRECTION NEEDS A GUARD. y = h*h/(2*ph) estimates how far back along
+     the ray the closest approach was, which is only meaningful while h is SHRINKING.
+     The moment a ray leaves an object's neighbourhood h grows, y overshoots h, the
+     sqrt clamps to zero, and the point is declared fully shadowed. On a snow field
+     that printed hard concentric rings around the man -- one per sample, out to the
+     march limit -- and they were in the lit buffer, not in any texture.
+     Bounding y below h keeps d strictly positive and t-y strictly ahead of the
+     closest approach. Branching on h>ph instead was the obvious guard and it is
+     wrong for the same reason the bug was: a discontinuous correction draws the
+     discontinuity, so the rings came back as a stipple. */
+  float y = min(h*h/(2.0*ph), h*0.98);
+  float d = sqrt(max(h*h-y*y,0.0));
+  if(real) res=min(res, k*d/max(t-y,0.0001));
+  ph = real? h : 1e20;                   // and it must not seed the next estimate
+  if(res<0.004||t>2.6)break;
+  t+=clamp(h,0.012,0.14);
  }
  return clamp(res,0.0,1.0);
 }
@@ -178,11 +230,13 @@ void main(){
  vec2 uv=(gl_FragCoord.xy-0.5*iRes)/iRes.y;
  vec3 f=normalize(uTa-uRo), rgt=normalize(cross(vec3(0,1,0),f)), up=cross(f,rgt);
  vec3 rd=normalize(uv.x*rgt+uv.y*up+uFoc*f);
+ float PXA=1.0/(iRes.y*uFoc);       // the angle one pixel subtends
  vec3 ro=uRo; float far=uFar;
 
  float t=0.05, near=1e9, nearT=0.0, mat=-1.0;
  for(int i=0;i<128;i++){
   vec3 p=ro+rd*t;
+  GFP=t*PXA/max(abs(rd.y),0.035);
   vec2 h=map(p);
   if(h.x/t<near){ near=h.x/t; nearT=t; }
   if(h.x<0.0008*max(t,1.0)){ mat=h.y; break; }   // one pixel is bigger further away
@@ -196,12 +250,26 @@ void main(){
  vec3 L =normalize(vec3(-0.34,0.60, 0.72));
  vec3 B =normalize(vec3( 0.30,-0.80,-0.52));
  float dif=max(dot(n,L),0.0);
- float sh =shadow(p+n*0.012,L,11.0);
+ /* SHADOW ACNE, ON SNOW. A fixed 12mm lift off the surface is enough when a pixel
+    is a few millimetres across and the surface is smooth, and not enough on a drift
+    whose micro-relief turns over inside one pixel: half the samples start below
+    their own ground and report a hit. On a white field lit from one side that came
+    out as a fine dotted stipple across the whole near ground. The lift has to be a
+    pixel's worth of surface, so it scales with the footprint. */
+ float sh =shadow(p+n*(0.012+GFP*5.0),L,11.0);
  float occ=ao(p,n);
  float bnc=max(dot(n,B),0.0);
  float sky=0.5+0.5*n.y;
  float lit=dif*mix(0.10,1.0,sh)*0.92 + bnc*0.52 + sky*0.085;
- float rim=pow(clamp(1.0-dot(n,-rd),0.0,1.0),1.9)*pow(max(dot(n,L),0.0),0.7);
+ /* RIM IS A SILHOUETTE EFFECT, AND A FLOOR HAS NO SILHOUETTE. Without the last
+    factor this term read (1 - n.dot(-rd)) as "the surface is turning away from me",
+    which is true of a shoulder and false of a road: a ground plane is grazing
+    EVERYWHERE, so every ground pixel took the full rim -- about +1.47 on a colour
+    that tops out at 1.0. The road material was authored at 0.61 and measured at 255.
+    Fifteen per cent of every street frame was a road that had been erased, and the
+    other white half of the picture was snow that had been erased with it. */
+ float rim=pow(clamp(1.0-dot(n,-rd),0.0,1.0),1.9)*pow(max(dot(n,L),0.0),0.7)
+          *(1.0-uRimGate*n.y*n.y*clamp(n.y,0.0,1.0));   // uRimGate 0 restores the known-bad
  /* ===== R4. THE FACE =====
     An eye is not geometry. Modelled as a ball in a socket it costs every ray every
     step and still reads wrong, because what makes a drawn face is the LINE -- the

@@ -34,11 +34,11 @@ export async function open(){
 export async function close(){ if(browser) await browser.close(); browser=page=null; }
 process.on("exit",()=>{ try{ browser&&browser.close(); }catch(e){} });
 /* pixels of one frame, rendered deterministically */
-export async function pixels(frame,w,h,opt={},mode=0){   // 0 picture 1 material 2 line 3 work
+export async function pixels(frame,w,h,opt={},mode=0){   // 0 picture 1 material 2 line 3 work 4 depth
  const pg=await open();
  return Uint8Array.from(await pg.evaluate(([frame,w,h,opt,mode])=>{
   window.__resetOpt(); window.__opt(opt);
-  (mode===1?window.__matFrame:mode===2?window.__lineFrame:mode===3?window.__primFrame:window.__frameTo)(frame,w,h);
+  (mode===1?window.__matFrame:mode===2?window.__lineFrame:mode===3?window.__primFrame:mode===4?window.__depthFrame:window.__frameTo)(frame,w,h);
   const c=document.querySelector('canvas'), g=c.getContext('webgl2');
   const px=new Uint8Array(c.width*c.height*4);
   g.readPixels(0,0,c.width,c.height,g.RGBA,g.UNSIGNED_BYTE,px);
@@ -58,3 +58,12 @@ export async function timed(frame,w,h,opt={}){
 }
 export const CHARACTER = m => (m>=1&&m<=6)||(m>=16&&m<=26);
 export const matOf = v => Math.round(v/255*32);
+
+/* what the film itself says about a frame: which drawing is up, how far the world
+   has travelled. Asked, never recomputed. */
+export async function state(frame,w=240,h=173){
+ const pg=await open();
+ return await pg.evaluate(([frame,w,h])=>{
+  window.__resetOpt(); const r=window.__frameTo(frame,w,h); window.__resetOpt(); return r;
+ },[frame,w,h]);
+}

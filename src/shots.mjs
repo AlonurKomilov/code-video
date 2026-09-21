@@ -4,9 +4,15 @@
 export const SHOTS=[
  {k:"ko'cha", snd:{wind:0.95,city:0.55,mute:0.0},  d:3.0, sc:1, two:0, ro:[-8.6,1.55,-1.25], ta:[4.60,1.05,-0.35], foc:2.30, far:62, sz:1.0,
   A:[0,0,0], aw:1},
- {k:'yurish', snd:{wind:0.70,city:0.10,mute:0.0}, d:2.2, sc:0, two:0, ro:[0.76,0.80,-3.10], ta:[0.02,0.50,0.00], foc:2.25, far:7, sz:2.6,
+ /* THE HORIZON WAS THE CLIP PLANE. With far:7 the snow field simply stopped being
+    marched seven units out, at which point the ray fell through to sky -- so the
+    "horizon" was a razor-straight level edge with a visible tone step across it,
+    which is the one thing a whiteout does not have. The ground now runs out to 24
+    and the weather closes over it first. It costs 1.9x the primitive evaluations of
+    a shot that was already the cheapest in the film. */
+ {k:'yurish', snd:{wind:0.70,city:0.10,mute:0.0}, d:2.2, sc:0, two:0, ro:[0.76,0.80,-3.10], ta:[0.02,0.50,0.00], foc:2.25, far:24, sz:2.6,
   A:[0,0,0], aw:1},
- {k:'yuz', snd:{wind:0.34,city:0.06,mute:0.55},    d:1.5, sc:0, two:0, ro:[0.44,1.00,-0.33], ta:[0.02,0.925,0.00], foc:2.28, far:3, sz:12.0,
+ {k:'yuz', snd:{wind:0.34,city:0.06,mute:0.55},    d:1.5, sc:0, two:0, ro:[0.44,1.00,-0.33], ta:[0.02,0.925,0.00], foc:2.28, far:16, sz:12.0,
   A:[0,0,0], aw:1, head:1},
  {k:'ikkinchi', snd:{wind:0.88,city:0.50,mute:0.0},d:1.3,sc:1, two:1, ro:[-3.2,1.05,-2.05], ta:[1.90,0.72,0.15], foc:2.40, far:40, sz:1.6,
   A:[0,0,0], B:[3.05,0,0.18], aw:1, bw:1},

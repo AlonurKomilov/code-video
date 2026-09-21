@@ -9,6 +9,11 @@ uniform vec3 RAMP[36];     // two characters, six materials each, three tones ea
 uniform float uLines;      // so the line pass can be turned off and compared
 uniform float uDebug;      // 1: material id  2: line strength -- so the audit has ground truth
 uniform float uScene;      // 0 the empty field, 1 the street, 2 the close-up
+uniform float uFog;        // 1 normal, 0 off -- so distance haze can be measured alone
+uniform float uSnow;       // 1 falling, 0 frozen on the glass -- the known-bad for the weather
+uniform float uWorkMax;    // full scale for the work probe -- a saturated probe is not a measurement
+uniform float uRimOld;     // 0 restores the rim exactly as it was: ungated, added after the bands
+uniform float uLineFar;    // 1 ink thins with distance, 0 the old full-strength -- the known-bad
 uniform vec3 uRo;          // the same camera pass one used, for the slope test
 uniform vec3 uTa;
 uniform float uFoc;
@@ -98,7 +103,12 @@ void main(){
   float brush=(vnoise(bq*85.0)-0.5)*0.70
              +(vnoise(bq*240.0)-0.5)*0.34;
   float amp=mix(0.008,0.054,clamp(curv*2.6,0.0,1.0));
-  float q=lit+brush*amp;
+  /* THE RIM HAS TO BE BANDED TOO. Added after the quantiser it was a smooth
+     gradient laid over flat cel tones, which is what made a wool hood read as wet
+     vinyl: the one continuous shading term in a picture made of hard steps reads as
+     a specular highlight, and the eye believes the gradient over the bands. Folded
+     into q it becomes a drawn light edge with an edge of its own. */
+  float q=lit+brush*amp+rim*1.05*uRimOld;
 
   int mi=int(mat+0.5);
   /* drawn marks are drawn: they do not take a light band, or the lash disappears
@@ -129,17 +139,25 @@ void main(){
   base *= mi==15 ? 1.0 : (faceish ? mix(0.94,1.0,occ) : mix(0.88,1.0,occ));
   if(mi==3||mi==23) base += vec3(0.085,0.070,0.062)*(0.35+0.65*occ);   // snow bounce, into the hood
   base += (0.5+0.5*n.y)*0.045*vec3(0.74,0.82,1.0);
-  base += rim*vec3(1.0,0.980,0.94)*2.10;
+  base += mix(rim*2.10, rim*rim*0.50, uRimOld)*vec3(1.0,0.980,0.94);   // the last sliver of the edge
   if(mi!=15) base *= faceish ? mix(0.80,1.0,smoothstep(0.12,0.42,occ))
                              : mix(0.42,1.0,smoothstep(0.30,0.46,occ));
   col=base;
   /* aerial perspective: in a whiteout the far end of a street is the sky */
-  float fog=1.0-exp(-mix(0.0045,0.0016,uScene)*t*t);
-  col=mix(col,SKY,fog);
+  float far=1.0-exp(-mix(0.0105,0.0016,uScene)*t*t);
+  col=mix(col,SKY,uFog*far);
 
   /* the line is drawn last and takes the ground's own darkness with it, so it reads
-     as ink on that surface rather than a black wire laid over the picture */
-  col=mix(col, min(col*0.26,INK), line*0.88);
+     as ink on that surface rather than a black wire laid over the picture.
+
+     AND IT HAS TO GO AWAY WITH DISTANCE. The contour below already faded -- a black
+     wire hanging in fog that had swallowed its building was obvious. The INTERIOR
+     line did not, and the depth test is a RELATIVE one, so at forty units every
+     window ledge and parapet spans about a pixel and nearly every pixel of a far
+     building reports an edge. The far end of the street was not fading into weather,
+     it was dissolving into black speckle. An artist draws fewer lines on far things;
+     this is that, as one multiply. */
+  col=mix(col, min(col*0.26,INK), line*0.88*(1.0-0.90*far*uLineFar));
  }
 
  /* the contour: a ray that came close and missed was grazing the silhouette */
@@ -147,21 +165,40 @@ void main(){
   /* a contour drawn at full strength on something forty units away is a black line
      hanging in fog that already swallowed the building it belongs to */
   float lineS=1.0-smoothstep(0.0004,0.0022,A.a);
-  float nfog=1.0-exp(-mix(0.0045,0.0016,uScene)*A.r*A.r);
-  col=mix(col,INK,lineS*0.95*(1.0-nfog));
+  float nfog=1.0-exp(-mix(0.0105,0.0016,uScene)*A.r*A.r);
+  col=mix(col,INK,lineS*0.95*(1.0-nfog*uLineFar));
  }
 
- /* THE AIR: near flakes streak long and pale, far ones barely move. */
+ /* ===== THE AIR =====
+    This had its weight in the wrong layer. The near flakes were the big ones and
+    carried 0.22 opacity -- five levels above the sky, which is nothing -- while the
+    far flakes carried 0.80 and were a sixth of a pixel across, so the bright ones
+    never landed on a sample at all. Measured over the sky of the street shot, the
+    whole snowfall moved 0.23% of the sky by more than six levels, at any resolution.
+    Aerial perspective runs the other way: what is close to you is dense and sharp,
+    what is far is thin and lost in the weather.
+
+    A flake is also a streak along its OWN fall, not along the y axis. And a flake
+    thinner than a pixel is a coin toss, not a flake, so each layer is grown to a
+    minimum screen footprint and its opacity divided by the area it gained -- which
+    is what an anti-aliased sample would have returned anyway. */
+ float snowT = uSnow>0.5 ? iTime : 0.0;
+ vec2 fall=normalize(vec2(-0.80,-1.0));
+ vec2 across=vec2(-fall.y,fall.x);
  for(int L2=0;L2<3;L2++){
-  float fl=float(L2);
-  float sc=mix(26.0,78.0,fl/2.0);
-  vec2 dir=normalize(vec2(-0.80,-1.0));
-  vec2 q2=sp*sc + dir*iTime*mix(9.0,26.0,fl/2.0)*-1.0;
+  float fl=float(L2)/2.0;
+  float sc=mix(23.0,58.0,fl);
+  vec2 q2=sp*sc - fall*snowT*mix(11.0,24.0,fl);
   vec2 ci=floor(q2), cf=fract(q2);
-  if(hash(ci+fl*37.0)>0.80){
+  if(hash(ci+fl*74.0)>mix(0.72,0.80,fl)){
    vec2 c2=vec2(hash(ci+7.0),hash(ci+19.0));
-   vec2 dv=(cf-c2); dv.x*=mix(3.0,1.4,fl/2.0);
-   float fa=smoothstep(mix(0.16,0.07,fl/2.0),0.0,length(dv))*mix(0.22,0.80,fl/2.0);
+   vec2 d0=cf-c2;
+   vec2 dv=vec2(dot(d0,across)*mix(2.9,1.5,fl), dot(d0,fall));  // the streak lies along the fall
+   float rad=mix(0.165,0.090,fl);
+   /* never finer than most of a pixel: grow it, and pay for the area in opacity */
+   float k=max(1.0, (0.80/iRes.y)/(rad/sc));
+   rad*=k;
+   float fa=smoothstep(rad,0.0,length(dv))*mix(0.66,0.20,fl)/(k*k);
    col=mix(col,vec3(0.985,0.990,1.0),fa);
   }
  }
@@ -169,7 +206,16 @@ void main(){
   if(uDebug<1.5) O=vec4(vec3(mat/32.0),1.0);
   else if(uDebug<2.5) O=vec4(vec3(line),1.0);
   else if(uDebug<3.5) O=vec4(clamp(dEdge/2.2,0.0,1.0), clamp(nEdge/0.62,0.0,1.0), mEdge, 1.0);
-  else O=vec4(vec3(A.r/4096.0),1.0);   // WORK: 4096 full scale
+  /* 4 and 5 are the SAME channel: pass one decides which counter it wrote, and this
+     pass only has to display it. Splitting depth off as 6 without giving the work
+     probe an upper bound handed channel 5 to depth, and the cost check spent a whole
+     session comparing a bounded render's depth against an unbounded render's depth,
+     which are of course identical. It reported 1.000 and failed, which is the only
+     reason this was found. */
+  else if(uDebug<5.5) O=vec4(vec3(A.r/uWorkMax),1.0);   // WORK
+  else if(uDebug<6.5) O=vec4(vec3(clamp(t/60.0,0.0,1.0)),1.0);   // DEPTH: 60 units full scale
+  else if(uDebug<7.5) O=vec4(vec3(A.r),1.0);          // LIT, before any banding
+  else O=vec4(vec3(A.g),1.0);                          // OCCLUSION
   return; }
 
  vec2 g=gl_FragCoord.xy;
