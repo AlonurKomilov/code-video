@@ -33,11 +33,11 @@ export async function open(){
 }
 export async function close(){ if(browser) await browser.close(); browser=page=null; }
 /* pixels of one frame, rendered deterministically */
-export async function pixels(frame,w,h,opt={},mode=0){   // 0 picture, 1 material, 2 line
+export async function pixels(frame,w,h,opt={},mode=0){   // 0 picture 1 material 2 line 3 work
  const pg=await open();
  return Uint8Array.from(await pg.evaluate(([frame,w,h,opt,mode])=>{
   window.__resetOpt(); window.__opt(opt);
-  (mode===1?window.__matFrame:mode===2?window.__lineFrame:window.__frameTo)(frame,w,h);
+  (mode===1?window.__matFrame:mode===2?window.__lineFrame:mode===3?window.__primFrame:window.__frameTo)(frame,w,h);
   const c=document.querySelector('canvas'), g=c.getContext('webgl2');
   const px=new Uint8Array(c.width*c.height*4);
   g.readPixels(0,0,c.width,c.height,g.RGBA,g.UNSIGNED_BYTE,px);

@@ -60,6 +60,21 @@ await check({name:'line-art', unit:'ink valley, levels',
  calibrate:async()=>0,        // lines off: by construction the valley does not deepen
  note:'measured as ink depth, not as contrast: a central difference skips the very pixel the line is on'});
 
+/* the cheap bounds must actually be cheap. Wall-clock on a shared software renderer
+   could not tell a real win from scheduling luck -- three runs of identical code gave
+   1122, 1405 and 3234 ms -- so this counts primitive evaluations instead, which is
+   exact, repeatable, and the same number on any machine. */
+await check({name:'bounds-save-work', unit:'x fewer primitive evals',
+ measure:async()=>{
+  const prim=async(bound)=>{
+   const p=await pixels(209,W,H,{bound},3); let s=0;
+   for(let k=0;k<W*H;k++) s+=p[k*4];
+   return 4096*(s/(W*H))/255;};
+  return (await prim(0))/(await prim(1));},
+ pass:v=>v>1.8,
+ calibrate:async()=>1.0,          // bounds on both sides: by construction, no saving
+ note:'a bounding sphere for the figure and a slab test for each terrace'});
+
 /* a shot whose subject is outside the frame is an empty shot */
 for(let i=0;i<SHOTS.length;i++){
  const sh=SHOTS[i], f=Math.round((STARTS[i]+sh.d*0.5)*FPS);

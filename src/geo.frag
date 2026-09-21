@@ -12,11 +12,17 @@ uniform vec3  uRo;        // the camera is the shot's business, not the shader's
 uniform vec3  uTa;
 uniform float uFoc;
 uniform float uFar;
+/* A conservative bound is still a valid distance, so a ray that is nowhere near the
+   figure can be told "at least this far" for the cost of one length(). */
+const vec3 FIG_C=vec3(0.0,0.52,0.0); const float FIG_R=0.68;
 uniform float iTime;
 uniform float iDist;   // how far he has walked, so the ground moves under him
 uniform float uScene;  // 0 the empty field, 1 the street
 uniform float uCell;   // how tightly the street is packed -- for the cost experiment
-uniform float uNbr;    // 1 evaluate the neighbouring cells, 0 do not -- the known-bad case
+uniform float uNbr;
+uniform float uProbe;   // 1: map() calls   2: primitive evaluations
+uniform float uBound;   // 1: use the cheap bounds  0: the known-bad, to measure them
+int MAPC=0, PRIMC=0;    // 1 evaluate the neighbouring cells, 0 do not -- the known-bad case
 /* Joint indices: 0 hip 1 shoulder 2 head 3 neck
    near 4 knee 5 ankle 6 toe 7 elbow 8 hand
    far  9 knee 10 ankle 11 toe 12 elbow 13 hand
@@ -74,12 +80,21 @@ float h11(float n){return fract(sin(n*127.1)*43758.5453);}
 vec2 mapEnv(vec3 p){
  vec3 q=p-vec3(iDist,0.0,0.0);
  float d,m;
- /* ground: the road is flatter and darker than the snow either side of it */
- vec2 w=vec2(q.x*0.40+q.z*0.92, q.z*0.40-q.x*0.92);
+ /* ground: the road is flatter and darker than the snow either side of it.
+    The drift noise is only worth computing NEAR the surface -- higher up, the plane
+    height minus the noise's own amplitude is already a valid bound. This runs at
+    every step of every ray, so texturing ground forty units below the ray was a
+    large part of the cost of every wide shot. */
  float road=smoothstep(1.55,1.15,abs(q.z-0.35));
- float g=p.y + mix(vnoise(w*vec2(2.2,15.0))*0.016+vnoise(w*vec2(7.0,44.0))*0.005,
-                   vnoise(q.xz*vec2(3.0,9.0))*0.004, road)
-             + vnoise(q.xz*70.0)*0.0016;
+ float g;
+ if(uBound>0.5 && p.y>0.34){ g=p.y-0.026; PRIMC+=1; }
+ else{
+  PRIMC+=5;
+  vec2 w=vec2(q.x*0.40+q.z*0.92, q.z*0.40-q.x*0.92);
+  g=p.y + mix(vnoise(w*vec2(2.2,15.0))*0.016+vnoise(w*vec2(7.0,44.0))*0.005,
+              vnoise(q.xz*vec2(3.0,9.0))*0.004, road)
+        + vnoise(q.xz*70.0)*0.0016;
+ }
  d=g; m=mix(10.0,14.0,step(0.5,road));
 
  if(uScene>0.5){
@@ -88,12 +103,17 @@ vec2 mapEnv(vec3 p){
    /* a terrace either side of the street, and a third block behind the far one */
    float zc = row==0 ? -4.85 : (row==1 ? 2.60 : 9.90);
    float sc = row==2 ? 1.9 : 1.0;
+   /* the row lives in a slab; the distance to the slab is a valid bound for every
+      building in it, so a ray far from the row never opens the cell loop */
+   float slab=max(abs(q.z-zc)-1.9*sc, q.y-7.1*sc);
+   if(uBound>0.5 && slab>0.75){ d=min(d,slab); PRIMC+=1; continue; }
    float id0=floor((q.x+float(row)*1.7)/CELL);
    int kk=uNbr>0.5?1:0;
    for(int k=-kk;k<=kk;k++){                      // the neighbours, or rays tunnel through
     float id=id0+float(k);
     float r1=h11(id*1.7+float(row)*31.0), r2=h11(id*4.3+float(row)*57.0), r3=h11(id*9.1+float(row)*11.0);
-    float ws=min(CELL/3.05,1.0);
+    PRIMC+=3;
+   float ws=min(CELL/3.05,1.0);
    float h=(2.6+r1*4.4)*sc, wd=(1.05+r2*0.42)*sc*ws, dp=(1.25+r3*0.55)*sc;
     vec3 c=vec3(CELL*(id+0.5)-float(row)*1.7, 0.0, zc+(r3-0.5)*0.34*sc);
     float b=sdBoxR(q-c-vec3(0.0,h*0.5,0.0), vec3(wd,h*0.5,dp), 0.02);
@@ -113,7 +133,8 @@ vec2 mapEnv(vec3 p){
    float post=sdRoundCone(q-c, vec3(0.0,0.0,0.0), vec3(0.0,2.30,0.0), 0.055, 0.032);
    float arm =sdRoundCone(q-c, vec3(0.0,2.26,0.0), vec3(0.0,2.34,-0.42), 0.030, 0.026);
    float lamp=sdEllipsoid(q-c-vec3(0.0,2.26,-0.46), vec3(0.11,0.13,0.11));
-   float l=min(post,min(arm,lamp));
+   PRIMC+=3;
+  float l=min(post,min(arm,lamp));
    if(l<d){d=l;m= lamp<min(post,arm) ? 15.0 : 13.0;}
   }
  }
@@ -121,6 +142,7 @@ vec2 mapEnv(vec3 p){
 }
 
 vec2 map(vec3 p){
+ MAPC++;
  vec2 f=mapFig(p);
  vec2 e=mapEnv(p);
  if(e.x<f.x) f=e;
@@ -132,18 +154,18 @@ vec3 calcN(vec3 p){
                   e.yxy*map(p+e.yxy).x + e.xxx*map(p+e.xxx).x);
 }
 float shadow(vec3 ro, vec3 rd, float k){
- float res=1.0,t=0.045;
- for(int i=0;i<40;i++){
+ float res=1.0,t=0.05;
+ for(int i=0;i<22;i++){
   float h=map(ro+rd*t).x;
-  res=min(res,k*h/t); if(res<0.003||t>3.0)break;
-  t+=clamp(h,0.006,0.10);
+  res=min(res,k*h/t); if(res<0.02||t>2.2)break;
+  t+=clamp(h,0.012,0.22);
  }
  return clamp(res,0.0,1.0);
 }
 float ao(vec3 p, vec3 n){
  float o=0.0,s=1.0;
- for(int i=0;i<5;i++){ float h=0.012+0.055*float(i); o+=(h-map(p+n*h).x)*s; s*=0.72; }
- return clamp(1.0-1.6*o,0.0,1.0);
+ for(int i=0;i<4;i++){ float h=0.014+0.068*float(i); o+=(h-map(p+n*h).x)*s; s*=0.68; }
+ return clamp(1.0-1.7*o,0.0,1.0);
 }
 
 /* PASS ONE writes what was MEASURED about the surface and decides nothing about how
@@ -159,7 +181,7 @@ void main(){
  vec3 ro=uRo; float far=uFar;
 
  float t=0.05, near=1e9, nearT=0.0, mat=-1.0;
- for(int i=0;i<180;i++){
+ for(int i=0;i<128;i++){
   vec3 p=ro+rd*t;
   vec2 h=map(p);
   if(h.x/t<near){ near=h.x/t; nearT=t; }
@@ -167,6 +189,7 @@ void main(){
   t+=h.x*0.92; if(t>far)break;
  }
  if(mat<0.0){         // a miss still carries the near-miss, and how far away it was
+  if(uProbe>0.5){ gA=vec4(uProbe<1.5?float(MAPC):float(PRIMC),0.0,0.0,0.0); gB=vec4(0.5,0.5,0.5,0.0); return; }
   gA=vec4(nearT,0.0,0.0,near); gB=vec4(0.5,0.5,0.5,0.0); return;
  }
  vec3 p=ro+rd*t, n=calcN(p);
@@ -231,6 +254,7 @@ void main(){
   if(fr.x>0.22&&fr.x<0.78&&fr.y>0.26&&fr.y<0.74&&q.y>0.55)
    mat = h11(floor(gq.x)*13.0+floor(gq.y)*7.0)>0.52 ? 15.0 : 12.0;
  }
+ if(uProbe>0.5){ gA=vec4(uProbe<1.5?float(MAPC):float(PRIMC),0.0,0.0,t); gB=vec4(0.5,0.5,0.5,0.0); return; }
  gA=vec4(lit,occ,rim,t);
  gB=vec4(n*0.5+0.5, mat/32.0);
 }

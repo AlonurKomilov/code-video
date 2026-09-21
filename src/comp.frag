@@ -168,7 +168,8 @@ void main(){
  if(uDebug>0.5){
   if(uDebug<1.5) O=vec4(vec3(mat/32.0),1.0);
   else if(uDebug<2.5) O=vec4(vec3(line),1.0);
-  else O=vec4(clamp(dEdge/2.2,0.0,1.0), clamp(nEdge/0.62,0.0,1.0), mEdge, 1.0);
+  else if(uDebug<3.5) O=vec4(clamp(dEdge/2.2,0.0,1.0), clamp(nEdge/0.62,0.0,1.0), mEdge, 1.0);
+  else O=vec4(vec3(A.r/4096.0),1.0);   // WORK: 4096 full scale
   return; }
 
  vec2 g=gl_FragCoord.xy;

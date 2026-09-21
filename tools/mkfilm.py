@@ -52,12 +52,15 @@ HEAD=r'''<title>Oq Ko'cha</title>
  <div class="bar">
   <button id="play" aria-pressed="true">Pauza</button>
   <button id="rew">Boshidan</button>
+  <span>sifat</span>
+  <button id="qa" aria-pressed="true">avto</button><button id="q0">past</button><button id="q1">o'rta</button><button id="q2">to'liq</button>
   <span id="q">—</span>
  </div>
  <dl>
   <dt>Kadr</dt><dd id="s1">—</dd>
   <dt>Oraliq</dt><dd id="s2">—</dd>
   <dt>Ruxsat</dt><dd id="s3">—</dd>
+  <dt>Grafika</dt><dd id="s4">—</dd>
  </dl>
  <p class="note">Ruxsat <em>o'zini boshqaradi</em>: kadr oralig'i 22 ms dan oshsa
   tushadi, 12 ms dan tushsa ko'tariladi. Shuning uchun bu sahifa telefonda ham,
@@ -116,7 +119,7 @@ const U=(p,n)=>gl.getUniformLocation(p,n);
 const G={p:gp,res:U(gp,'iRes'),t:U(gp,'iTime'),d:U(gp,'iDist'),sc:U(gp,'uScene'),
  JA:U(gp,'JA'),JB:U(gp,'JB'),pA:U(gp,'uPosA'),pB:U(gp,'uPosB'),two:U(gp,'uTwo'),
  ro:U(gp,'uRo'),ta:U(gp,'uTa'),foc:U(gp,'uFoc'),far:U(gp,'uFar'),
- cell:U(gp,'uCell'),nbr:U(gp,'uNbr')};
+ cell:U(gp,'uCell'),nbr:U(gp,'uNbr'),probe:U(gp,'uProbe'),bound:U(gp,'uBound')};
 const K={p:cp,res:U(cp,'iRes'),t:U(cp,'iTime'),sc:U(cp,'uScene'),ramp:U(cp,'RAMP'),
  gA:U(cp,'gA'),gB:U(cp,'gB'),lines:U(cp,'uLines'),dbg:U(cp,'uDebug'),
  ro:U(cp,'uRo'),ta:U(cp,'uTa'),foc:U(cp,'uFoc')};
@@ -138,18 +141,32 @@ function fb(w,h){
  gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
 }
-/* R6. The page does not know what it is running on, so it finds out: one number,
-   the frame interval, moved toward a target and nothing else touched. */
-let SCALE=0.62;
+/* R6. The page does not know what it is running on, so it finds out. It starts LOW
+   and climbs, because the opposite order means the first thing a slow machine does
+   is render a frame it cannot afford -- and at half a second a frame it then takes
+   ten seconds to notice. Down is multiplicative and immediate; up is a slow creep
+   that needs a run of cheap frames to earn. */
+let SCALE=0.34, AUTO=true, settle=0, warm=0;
 function size(){
  const w=c.clientWidth||560;
- const dpr=Math.min(window.devicePixelRatio||1,2)*SCALE;
- c.width=Math.max(200,Math.round(w*dpr)); c.height=Math.round(c.width*0.72);
+ const dpr=Math.min(window.devicePixelRatio||1,1.75)*SCALE;
+ c.width=Math.max(180,Math.round(w*dpr)); c.height=Math.round(c.width*0.72);
+}
+function adapt(ms){
+ if(!AUTO) return;
+ if(warm<18){warm++; return;}          // the first frames pay for shader compilation
+ let s=SCALE;
+ if(ms>30) s=SCALE*0.78;
+ else if(ms>21) s=SCALE*0.92;
+ else if(ms<13){ settle++; if(settle>26){ s=SCALE+0.05; settle=0; } }
+ else settle=0;
+ s=Math.max(0.20,Math.min(1.0,s));
+ if(Math.abs(s-SCALE)>0.012){ SCALE=s; size(); }
 }
 const JA=new Float32Array(48), JB=new Float32Array(48);
 let T=0,phA=0,phB=0.37,dist=0,frameNo=0,playing=true,last=performance.now(),ft=16,DBG=0;
 /* every knob the audit needs to break the picture on purpose, in one place */
-const OPT={lines:1,nbr:1,cell:0,cam:null};
+const OPT={lines:1,nbr:1,cell:0,cam:null,bound:1};
 function shotAt(t){let i=0;for(let j=0;j<SHOTS.length;j++)if(t>=S[j])i=j;return i;}
 function render(){
  const i=shotAt(T), sh=SHOTS[i], lt=T-S[i], u=Math.min(lt/sh.d,1);
@@ -166,6 +183,7 @@ function render(){
  gl.uniform2f(G.res,c.width,c.height);
  gl.uniform1f(G.t,T); gl.uniform1f(G.d,dist); gl.uniform1f(G.sc,sh.sc);
  gl.uniform1f(G.two,sh.two); gl.uniform1f(G.cell,OPT.cell); gl.uniform1f(G.nbr,OPT.nbr);
+ gl.uniform1f(G.probe,DBG===4?1:DBG===5?2:0); gl.uniform1f(G.bound,OPT.bound);
  gl.uniform3f(G.pA,(sh.A?sh.A[0]:0)+ax,0,sh.A?sh.A[2]:0);
  gl.uniform3f(G.pB,bx,0,sh.B?sh.B[2]:0);
  gl.uniform3fv(G.JA,JA); gl.uniform3fv(G.JB,JB);
@@ -199,18 +217,32 @@ function frame(now){
  ft=ft*0.88+raw*1000*0.12;
  if(playing){acc+=raw; while(acc>=DT){step(DT);acc-=DT;}}
  const i=render();
- if(ft>22&&SCALE>0.36){SCALE=Math.max(0.36,SCALE-0.04);size();}
- else if(ft<12&&SCALE<1.0){SCALE=Math.min(1.0,SCALE+0.03);size();}
+ adapt(ft);
  const sh=SHOTS[i];
  hud.textContent=(i+1)+'/'+SHOTS.length+'  '+sh.k;
  s1.textContent=(i+1)+' — '+sh.k+'  ·  '+sh.d.toFixed(1)+' s  ·  o‘lcham '+sh.sz.toFixed(1)+'x';
  s2.textContent=ft.toFixed(1)+' ms  ·  '+(1000/Math.max(ft,0.001)).toFixed(0)+' fps';
- s3.textContent=c.width+'x'+c.height+'  ·  '+(SCALE*100).toFixed(0)+'%';
+ s3.textContent=c.width+'x'+c.height+'  ·  '+(SCALE*100).toFixed(0)+'%'+(AUTO?' (avto)':'');
  qEl.textContent=T.toFixed(1)+' / '+TOTAL.toFixed(1)+' s';
  [...tl.children].forEach((e,k)=>e.classList.toggle('on',k===i));
  requestAnimationFrame(frame);
 }
+/* WHAT IS ACTUALLY DRAWING THIS. A browser that has fallen back to software says so
+   here, and that is a different problem from the page being too heavy. */
+{const d=gl.getExtension('WEBGL_debug_renderer_info');
+ const r=d? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : '(brauzer aytmaydi)';
+ const soft=/swiftshader|llvmpipe|software|basic render/i.test(r);
+ const el=document.getElementById('s4');
+ el.textContent = r.length>62? r.slice(0,62)+'…' : r;
+ if(soft){ el.textContent += '  — GPU ishlamayapti, protsessorda';
+  el.style.color='var(--acc)'; SCALE=0.22; }
+}
 addEventListener('resize',size); size(); requestAnimationFrame(frame);
+const setQ=(v)=>{AUTO=(v<0); if(!AUTO){SCALE=[0.26,0.45,0.85][v];size();}
+ ['qa','q0','q1','q2'].forEach((id,k)=>document.getElementById(id)
+   .setAttribute('aria-pressed', (k-1)===v || (v<0&&k===0)));};
+document.getElementById('qa').onclick=()=>{setQ(-1);settle=0;};
+[0,1,2].forEach(v=>{document.getElementById('q'+v).onclick=()=>setQ(v);});
 const pl=document.getElementById('play');
 pl.onclick=()=>{playing=!playing;pl.textContent=playing?'Pauza':'Davom';pl.setAttribute('aria-pressed',playing);};
 document.getElementById('rew').onclick=()=>{T=0;phA=0;phB=0.37;dist=0;acc=0;};
@@ -222,8 +254,11 @@ window.__total=TOTAL; window.__fps=FPS; window.__shots=SHOTS.map(s=>({k:s.k,d:s.
    difference; brightness never did. */
 window.__matFrame=(n,w,h)=>{DBG=1;const r=window.__frameTo(n,w,h);DBG=0;return r;};
 window.__lineFrame=(n,w,h)=>{DBG=2;const r=window.__frameTo(n,w,h);DBG=0;return r;};
+/* WORK, not wall-clock: map() evaluations per pixel, exact and repeatable */
+window.__workFrame=(n,w,h)=>{DBG=4;const r=window.__frameTo(n,w,h);DBG=0;return r;};
+window.__primFrame=(n,w,h)=>{DBG=5;const r=window.__frameTo(n,w,h);DBG=0;return r;};
 window.__opt=(o)=>{Object.assign(OPT,o);};
-window.__resetOpt=()=>{OPT.lines=1;OPT.nbr=1;OPT.cell=0;OPT.cam=null;};
+window.__resetOpt=()=>{OPT.lines=1;OPT.nbr=1;OPT.cell=0;OPT.cam=null;OPT.bound=1;};
 window.__frameTo=(n,w,h)=>{
  playing=false; T=0;phA=0;phB=0.37;dist=0;acc=0;
  if(w){c.width=w;c.height=h;}

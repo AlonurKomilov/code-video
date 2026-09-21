@@ -98,10 +98,17 @@ if(args.length){
  const nm=(c)=>'fig_'+c.name.replace(/[^a-z0-9]/gi,'_');
  const disp=[
   'vec2 mapFig(vec3 p){',
-  ` vec2 a=${nm(chars[0])}(p-uPosA, JA);`,
+  ' /* the bound first: in a street shot the man is a few percent of the frame and',
+  '    every other ray was paying for forty primitives to find that out. */',
+  ' vec3 pa=p-uPosA;',
+  ' float ba=length(pa-FIG_C)-FIG_R;',
+  ` bool fa=(uBound<0.5)||ba<=0.04; PRIMC+=fa?40:1;`,
+  ` vec2 a = fa ? ${nm(chars[0])}(pa, JA) : vec2(ba,1.0);`,
   ' if(uTwo<0.5) return a;',
   ' vec3 q=p-uPosB; q.x=-q.x;              // mirrored: he faces the other way',
-  ` vec2 b=${nm(chars[1]||chars[0])}(q, JB);`,
+  ' float bb=length(q-FIG_C)-FIG_R;',
+  ` bool fb=(uBound<0.5)||bb<=0.04; PRIMC+=fb?40:1;`,
+  ` vec2 b = fb ? ${nm(chars[1]||chars[0])}(q, JB) : vec2(bb,21.0);`,
   ' return b.x<a.x? b : a;',
   '}'].join('\n');
  frag=frag.replace('//#CHARACTER_MAP',fns+'\n'+disp);
