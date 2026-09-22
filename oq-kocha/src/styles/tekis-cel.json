@@ -1,0 +1,385 @@
+{
+ "name": "tekis-cel",
+ "title": "Tekis cel",
+ "note": "Flat cel. No paper, no brush: the light edge is a hard step, the ink keeps its weight into the distance the way a painted background keeps its outlines, the rim is a bright drawn band, and the air is thin. Wider values, more colour. Same film, same drawings, same cameras.",
+ "p": {
+  "Band": [
+   0.255,
+   0.268,
+   0.505,
+   0.518
+  ],
+  "DrawnLit": [
+   0.3
+  ],
+  "Ink": [
+   0.07,
+   0.062,
+   0.088
+  ],
+  "InkStrength": [
+   1.0
+  ],
+  "InkFloor": [
+   1.0
+  ],
+  "Contour": [
+   1.0
+  ],
+  "InkFade": [
+   0.34
+  ],
+  "InkDepthTol": [
+   0.0075
+  ],
+  "InkDepthEdge": [
+   1.35,
+   2.2
+  ],
+  "InkNormalEdge": [
+   0.34,
+   0.52
+  ],
+  "BrushStretch": [
+   13.0
+  ],
+  "BrushOct": [
+   85.0,
+   0.7,
+   240.0,
+   0.34
+  ],
+  "BrushAmp": [
+   0.0,
+   0.0
+  ],
+  "BrushCurv": [
+   2.6
+  ],
+  "Rim": [
+   1.62,
+   0.0
+  ],
+  "Occ": [
+   0.94,
+   0.56,
+   0.24,
+   0.44
+  ],
+  "OccFace": [
+   0.97,
+   0.88,
+   0.1,
+   0.38
+  ],
+  "Sky": [
+   0.855,
+   0.895,
+   0.945
+  ],
+  "SkyGrad": [
+   0.965,
+   1.03
+  ],
+  "Fog": [
+   0.0042,
+   0.0009
+  ],
+  "SkyFill": [
+   0.03
+  ],
+  "SkyFillCol": [
+   0.74,
+   0.82,
+   1.0
+  ],
+  "HoodBounce": [
+   0.085,
+   0.07,
+   0.062
+  ],
+  "Paper": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "Vignette": [
+   0.0
+  ],
+  "Gamma": [
+   1.0
+  ],
+  "FlakeScale": [
+   23.0,
+   58.0
+  ],
+  "FlakeDens": [
+   0.8,
+   0.86
+  ],
+  "FlakeRad": [
+   0.2,
+   0.1
+  ],
+  "FlakeAlpha": [
+   0.92,
+   0.34
+  ],
+  "FlakeSpeed": [
+   11.0,
+   24.0
+  ],
+  "FlakeStretch": [
+   2.2,
+   1.4
+  ],
+  "FlakeMin": [
+   0.8
+  ],
+  "FlakeCol": [
+   0.985,
+   0.99,
+   1.0
+  ],
+  "FlakeDir": [
+   -0.8,
+   -1.0
+  ],
+  "Key": [
+   -0.34,
+   0.6,
+   0.72
+  ],
+  "Bounce": [
+   0.3,
+   -0.8,
+   -0.52
+  ],
+  "LitMix": [
+   0.22,
+   0.94,
+   0.46,
+   0.1
+  ],
+  "Penumbra": [
+   26.0
+  ],
+  "RimPow": [
+   1.9,
+   0.7
+  ]
+ },
+ "pal": {
+  "10": [
+   [
+    0.469,
+    0.565,
+    0.756
+   ],
+   [
+    0.797,
+    0.845,
+    0.929
+   ],
+   [
+    1.0,
+    1.0,
+    1.0
+   ]
+  ],
+  "11": [
+   [
+    0.15,
+    0.159,
+    0.191
+   ],
+   [
+    0.288,
+    0.305,
+    0.353
+   ],
+   [
+    0.453,
+    0.475,
+    0.527
+   ]
+  ],
+  "12": [
+   [
+    0.01,
+    0.012,
+    0.016
+   ],
+   [
+    0.055,
+    0.062,
+    0.081
+   ],
+   [
+    0.113,
+    0.126,
+    0.155
+   ]
+  ],
+  "13": [
+   [
+    0.016,
+    0.018,
+    0.023
+   ],
+   [
+    0.099,
+    0.109,
+    0.132
+   ],
+   [
+    0.208,
+    0.224,
+    0.26
+   ]
+  ],
+  "14": [
+   [
+    0.278,
+    0.339,
+    0.456
+   ],
+   [
+    0.446,
+    0.508,
+    0.615
+   ],
+   [
+    0.626,
+    0.679,
+    0.76
+   ]
+  ],
+  "15": [
+   [
+    0.886,
+    0.71,
+    0.358
+   ],
+   [
+    0.978,
+    0.847,
+    0.535
+   ],
+   [
+    1.0,
+    0.945,
+    0.781
+   ]
+  ],
+  "16": [
+   [
+    0.572,
+    0.566,
+    0.587
+   ],
+   [
+    0.855,
+    0.857,
+    0.872
+   ],
+   [
+    1.0,
+    1.0,
+    1.0
+   ]
+  ],
+  "17": [
+   [
+    0.006,
+    0.01,
+    0.014
+   ],
+   [
+    0.072,
+    0.109,
+    0.141
+   ],
+   [
+    0.172,
+    0.257,
+    0.322
+   ]
+  ],
+  "18": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.017,
+    0.016,
+    0.02
+   ]
+  ],
+  "19": [
+   [
+    0.083,
+    0.057,
+    0.046
+   ],
+   [
+    0.236,
+    0.169,
+    0.138
+   ],
+   [
+    0.413,
+    0.311,
+    0.26
+   ]
+  ],
+  "20": [
+   [
+    1.0,
+    1.0,
+    1.0
+   ],
+   [
+    1.0,
+    1.0,
+    1.0
+   ],
+   [
+    1.0,
+    1.0,
+    1.0
+   ]
+  ]
+ },
+ "claims": {
+  "note": "Thin air and ink that keeps its weight are this style's decisions, so two of its four numbers are looser than the other style's and one is tighter. A looser claim is still a claim: each is measured against the same deliberately broken render, and has to reject it.",
+  "horizonStep": [
+   "<",
+   20.0,
+   "levels: a defined horizon is allowed here, a cut edge is not"
+  ],
+  "groundTone": [
+   ">",
+   40.0,
+   "levels between road and snow"
+  ],
+  "inkFade": [
+   ">",
+   1.15,
+   "a painted background keeps its outlines; it may thin, barely"
+  ],
+  "snowFalls": [
+   ">",
+   1.5,
+   "% of wall pixels the weather moves in one held drawing"
+  ]
+ }
+}

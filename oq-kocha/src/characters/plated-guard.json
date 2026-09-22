@@ -1,0 +1,57 @@
+{
+  "name": "plated-guard",
+  "note": "A second figure. Not one line of shader was written for him — same engine, same sixteen drawings, same timing chart. Only this document is different.",
+  "materials": {
+    "plate": {"id":1, "ramp":[[0.098,0.107,0.124],[0.212,0.228,0.255],[0.430,0.452,0.487]]},
+    "boot":  {"id":2, "ramp":[[0.040,0.044,0.055],[0.088,0.094,0.110],[0.160,0.170,0.190]]},
+    "steel": {"id":3, "ramp":[[0.140,0.152,0.176],[0.300,0.320,0.352],[0.620,0.646,0.685]]},
+    "sash":  {"id":4, "ramp":[[0.262,0.070,0.048],[0.470,0.140,0.086],[0.720,0.268,0.170]]}
+  },
+  "body": {
+    "mat": "plate",
+    "of": [
+      { "note":"hips, heavier than a man's", "ellip":[{"p":"hip","add":[0,0.015,0]},[0.086,0.078,0.102]] },
+      { "note":"breastplate: one big barrel, no waist", "joinK":0.060,
+        "ellip":[{"mix":["hip","shoulder",0.62],"add":[0.010,0.012,0]},[0.096,0.118,0.116]] },
+      { "note":"gorget", "joinK":0.045, "cone":["shoulder","neck",0.052,0.044] },
+      { "note":"near leg", "joinK":0.050, "k":0.034, "smin":[
+        { "cone":[{"p":"hip","add":[0,0,0.050]},"knee.n",0.072,0.054] },
+        { "cone":["knee.n","ankle.n",0.056,0.038] }]},
+      { "note":"far leg", "joinK":0.050, "k":0.034, "smin":[
+        { "cone":[{"p":"hip","add":[0,0,-0.050]},"knee.f",0.068,0.051] },
+        { "cone":["knee.f","ankle.f",0.053,0.036] }]},
+      { "note":"near arm", "joinK":0.042, "k":0.030, "smin":[
+        { "cone":[{"p":"shoulder","add":[0,0,0.082]},"elbow.n",0.056,0.042] },
+        { "cone":["elbow.n","hand.n",0.044,0.032] }]},
+      { "note":"far arm", "joinK":0.042, "k":0.030, "smin":[
+        { "cone":[{"p":"shoulder","add":[0,0,-0.082]},"elbow.f",0.052,0.039] },
+        { "cone":["elbow.f","hand.f",0.041,0.030] }]}
+    ]
+  },
+  "over": [
+    { "mat":"steel", "note":"pauldrons: the whole silhouette is these two",
+      "min":[
+        { "ellip":[{"p":"shoulder","add":[0.006,0.008,0.074]},[0.086,0.070,0.078]] },
+        { "ellip":[{"p":"shoulder","add":[0.006,0.008,-0.074]},[0.082,0.067,0.074]] }]},
+    { "mat":"steel", "note":"tassets, short and hard",
+      "min":[
+        { "sheet":[{"p":"hip","add":[0.008,0.010,0.058]},
+                   {"p":"hip","add":[-0.014,-0.115,0.078]},0.058,0.070,1.05,0.30] },
+        { "sheet":[{"p":"hip","add":[0.008,0.010,-0.058]},
+                   {"p":"hip","add":[-0.014,-0.115,-0.078]},0.058,0.070,1.05,0.30] }]},
+    { "mat":"sash", "note":"one warm thing on a cold man",
+      "k":0.038, "smin":[
+        { "sheet":[{"p":"neck","add":[-0.018,-0.014,0]},{"p":"cloak.mid","add":[0.004,0.034,0]},0.024,0.038,0.28,0.80] },
+        { "sheet":[{"p":"cloak.mid","add":[0.004,0.034,0]},{"p":"cloak.hem","add":[-0.018,0.070,0]},0.038,0.050,0.24,0.85] }]},
+    { "mat":"boot", "note":"sabatons",
+      "min":[
+        { "cone":["ankle.n","toe.n",0.050,0.038] },
+        { "cone":["ankle.f","toe.f",0.048,0.036] }]},
+    { "mat":"steel", "note":"the helm sits ON the gorget, with a visor slot cut through it",
+      "min":[
+        { "sub":[
+          { "ellip":[{"p":"head","add":[-0.004,0.004,0]},[0.072,0.076,0.066]] },
+          { "box":[{"p":"head","add":[0.052,0.002,0]},[0.052,0.011,0.062],0.004] }]},
+        { "cone":["neck",{"p":"head","add":[-0.010,-0.030,0]},0.054,0.064] }]}
+  ]
+}
