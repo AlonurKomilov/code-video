@@ -1,0 +1,1093 @@
+<title>Whiteout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --snow-hi:#f1f3f3; --snow:#dfe3e4; --snow-lo:#c6cccd;
+  --figure:#0f1214; --blood:#a1221a;
+  --shell:#0c0e0f; --shell-2:#161a1c; --shell-line:#2b3234;
+  --shell-text:#dde3e4; --shell-dim:#7f8b8d;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--shell);color:var(--shell-text);
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding-block:20px;padding-left:16px;padding-right:16px;gap:14px;
+}
+.wrap{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:12px}
+.stage{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;
+  background:var(--snow);overflow:hidden;border:1px solid var(--shell-line)}
+canvas{display:block;width:100%;height:100%}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+button{font:500 12px/1 "IBM Plex Mono",monospace;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--shell-text);background:var(--shell-2);border:1px solid var(--shell-line);
+  padding:9px 14px;cursor:pointer;transition:border-color .15s,color .15s}
+button:hover{border-color:var(--blood);color:#fff}
+button:focus-visible{outline:2px solid var(--blood);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--blood);color:#fff}
+.spacer{flex:1 1 auto;min-width:0}
+.shots{display:grid;grid-template-columns:repeat(13,1fr);gap:2px;width:100%}
+.shots i{height:3px;background:var(--shell-2);display:block;position:relative;overflow:hidden}
+.shots i b{position:absolute;inset:0 auto 0 0;width:0;background:var(--blood);display:block}
+.meta{font-size:11px;line-height:1.6;color:var(--shell-dim);letter-spacing:.04em;
+  display:flex;gap:16px;flex-wrap:wrap}
+.meta b{color:var(--shell-text);font-weight:500}
+</style>
+
+<div class="wrap">
+  <div class="stage"><canvas id="cv" width="1920" height="1080" aria-label="A silhouette story in a blizzard: a figure walks toward an opponent who turns out to share his own shape"></canvas></div>
+  <div class="shots" id="shots" aria-hidden="true"></div>
+  <div class="bar">
+    <button id="play" type="button">Qayta ijro</button>
+    <button id="snd" type="button" aria-pressed="false">Ovoz: o'chiq</button>
+    <span class="spacer"></span>
+  </div>
+  <div class="meta">
+    <span><b>19.3 s</b> · 13 kadr · 24 fps, personajlar 12 da</span>
+    <span>16 chizilgan poza · oyoq sirpanishi 0 · sakrash kesimi yo'q</span>
+    <span>Plash, qor sachrashi, nafas, tomchi — fizika bilan</span>
+  </div>
+</div>
+
+<script>
+(function(){
+const cv=document.getElementById('cv'),g=cv.getContext('2d');
+const W=1920,H=1080,TAU=Math.PI*2;
+const SNOW_HI='#f1f3f3',SNOW='#dfe3e4',SNOW_LO='#c6cccd',FIG='#0f1214',BLOOD='#a1221a';
+const lerp=(a,b,t)=>a+(b-a)*t, clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const ease=x=>1-Math.pow(1-x,3);
+
+/* ---- deterministic core ----------------------------------------------------
+   A piece you cannot step frame by frame is a piece you cannot CHECK frame by
+   frame. Seeded RNG and a fixed timestep make every run identical, which is the
+   precondition for everything below it. */
+let RS=12345;
+function rnd(){RS=(RS*1664525+1013904223)>>>0;return RS/4294967296;}
+function reseed(){RS=12345;}
+const FPS=24, DT=1/FPS;              // authored at 24, like film
+const TWOS=2;                        // characters exposed every 2nd frame -> 12 drawings/s
+
+const SHOTS=[
+ {d:3.00,k:'far'},{d:2.00,k:'walk'},{d:1.80,k:'boot'},
+ {d:1.60,k:'meet'},{d:0.60,k:'other'},{d:0.42,k:'charge'},{d:0.17,k:'clash'},
+ {d:0.125,k:'impactA'},{d:0.085,k:'impactB'},{d:1.15,k:'after'},
+ {d:2.00,k:'drop'},{d:2.40,k:'backs'},{d:4.00,k:'alone'}
+];
+const S=[];{let a=0;for(const s of SHOTS){S.push(a);a+=s.d;}}
+const TOTAL=S[S.length-1]+SHOTS[SHOTS.length-1].d;
+
+/* ===================== SNOW =====================
+   Snow does not fall; it is carried. A flake reaches terminal velocity almost at once
+   and after that the wind decides where it goes, so horizontal travel dominates and the
+   flutter is turbulence, not a tidy sine. Near flakes are fast, big and streaked; far
+   ones are slow, small and nearly still — that parallax is the only depth cue a
+   whiteout leaves you. */
+const flakes=[];
+for(let i=0;i<1150;i++){
+ const z=Math.pow(rnd(),0.7);
+ flakes.push({x:rnd()*W,y:rnd()*H,z,
+  r:lerp(0.8,6.2,z*z), vy:lerp(30,300,z), sw:rnd()*TAU,
+  tw:0.6+rnd()*2.2, a:lerp(.10,.70,z)});
+}
+function snow(t,wind,freeze,sc){
+ sc=sc||1;
+ for(const f of flakes){
+  let x,y,vx;
+  if(freeze&&f.fx!==undefined){x=f.fx;y=f.fy;vx=f.fvx||0;}
+  else{
+   const drift=wind*lerp(40,260,f.z);
+   y=(f.y+t*f.vy)%(H+80)-40;
+   x=(f.x+t*drift+Math.sin(t*f.tw+f.sw)*lerp(6,26,f.z))%(W+120)-60;
+   vx=drift;f.fx=x;f.fy=y;f.fvx=vx;
+  }
+  g.globalAlpha=f.a;
+  g.fillStyle=f.z>.6?'#ffffff':SNOW_HI;
+  const r=f.r*sc;
+  if(f.z>.34&&!freeze){
+   const ang=Math.atan2(f.vy,vx);                 // the streak lies along the real velocity
+   const len=r*lerp(1.4,4.2,f.z);
+   g.beginPath();g.ellipse(x,y,len,r*0.8,ang,0,TAU);g.fill();
+  }else{g.beginPath();g.arc(x,y,r,0,TAU);g.fill();}
+ }
+ g.globalAlpha=1;
+}
+function ground(yBase,drift,scroll){
+ const sx0=scroll||0;
+ const grd=g.createLinearGradient(0,yBase-160,0,H);
+ grd.addColorStop(0,'rgba(198,204,205,0)');
+ grd.addColorStop(.5,SNOW_LO);grd.addColorStop(1,'#b6bdbe');
+ g.fillStyle=grd;
+ g.beginPath();g.moveTo(-60,H+40);g.lineTo(-60,yBase+20);
+ for(let x=-60;x<=W+60;x+=40)
+  g.lineTo(x,yBase+Math.sin((x+sx0)*0.0031)*12+Math.sin((x+sx0)*0.0009)*20+Math.sin((x+sx0)*0.011)*3);
+ g.lineTo(W+60,H+40);g.closePath();g.fill();
+ if(drift!==false){                               /* wind-carved ridges, lit from above */
+  g.save();g.globalAlpha=.30;g.strokeStyle='#ffffff';g.lineWidth=3;
+  for(let k=0;k<7;k++){
+   const y=yBase+34+k*k*9;
+   if(y>H)break;
+   const par=1-k*0.11;                              // nearer ridges scroll faster
+   g.beginPath();
+   for(let x=-60;x<=W+60;x+=30)
+    g.lineTo(x,y+Math.sin((x+sx0*par)*0.0042+k*1.7)*(7+k*2)+Math.sin((x+sx0*par)*0.013+k)*2.5);
+   g.stroke();
+  }
+  g.restore();
+ }
+}
+function speedLines(a){                              /* 流線 — the air being cut */
+ if(a<=0)return;
+ g.save();g.globalAlpha=a;g.strokeStyle='#ffffff';g.lineCap='round';
+ for(let q=0;q<26;q++){
+  const y=(q*97+((q*53)%61))%H, w=lerp(120,540,(q*0.41)%1);
+  g.lineWidth=lerp(2,7,(q*0.77)%1);
+  const x=(q*311+ (T*1400))%(W+700)-350;
+  g.beginPath();g.moveTo(x,y);g.lineTo(x+w,y);g.stroke();
+ }
+ g.restore();
+}
+function haze(a){g.save();g.globalAlpha=a;g.fillStyle=SNOW;g.fillRect(-40,-40,W+80,H+80);g.restore();}
+
+/* ===================== THE BODY =====================
+   There is no solver here. A knee is at the position somebody put it. */
+
+/* ===================== AUTHORED KEY POSES =====================
+   Path B. The rig is gone from here down. Every joint in every pose below is a
+   CHOSEN position, not a solved one -- which is the whole difference between a
+   drawing and a diagram. Coordinates are in the 100-unit body, feet on y=0.
+
+   The walk is the classic eight: CONTACT, DOWN, PASSING, UP, then the same four
+   with the legs swapped. The near foot is planted through poses 0-4, its x
+   stepping back 8.5 units each time, so the body's speed falls out of the poses
+   instead of being dialled in: 68 units per cycle.
+
+   HOLDS are the timing chart. Slow at the contacts, fast through the passing --
+   spacing, not easing, is how hand-drawn animation gets its weight. */
+const PW = [
+ /* 0 CONTACT  — heel strike. The body is at its longest and its slowest: held 3 slots,
+    which is why it also travels furthest here — 12.75 units under one drawing. */
+ {hip:-49.9, lean:0.155, arch:6.8, sh:[1.5,-82.4], hd:[1.2,-0.3], hold:3,
+  nk:[12.87,-28.47], na:[18,-4], nf:0.26,
+  fk:[-4.24,-25.26], fa:[-16,-3.2], ff:-0.52,
+  neb:[-7.04,-65.43], nh:[-11.72,-50.86],
+  feb:[7.35,-64.43], fh:[12.78,-50.12],
+  cl:[[-4,-79],[-9.5,-70],[-14,-60],[-17,-49]]},
+ /* 1 DOWN     — the lowest point. The knee takes the load and the whole body drops. */
+ {hip:-51, lean:0.185, arch:8.2, sh:[2.8,-83.3], hd:[1.5,0.2], hold:2,
+  nk:[9.08,-27.71], na:[5.25,-3], nf:0.06,
+  fk:[-2.3,-26.11], fa:[-19,-7.5], ff:-0.86,
+  neb:[-3.39,-65.34], nh:[-7.66,-50.64],
+  feb:[6.59,-64.68], fh:[10.27,-50.23],
+  cl:[[-4,-76],[-10,-67],[-15,-57],[-19,-46]]},
+ /* 2 PASSING  — the highest point, legs together, planted leg straight, free knee through.
+    Held 1 slot: the fast drawing. Slow-fast-slow is the entire trick. */
+ {hip:-52.9, lean:0.135, arch:5.4, sh:[1,-85], hd:[0.8,-0.7], hold:1,
+  nk:[-1.03,-27.92], na:[-3.25,-3.02], nf:-0.04,
+  fk:[11.87,-30.9], fa:[-7,-14.5], ff:-0.3,
+  neb:[-4.43,-66.79], nh:[-4,-51.5],
+  feb:[2.75,-66.91], fh:[4.97,-51.77],
+  cl:[[-4,-82],[-8,-73],[-11,-63],[-12,-52]]},
+ /* 3 UP       — the push-off: the planted leg drives the body up and forward. */
+ {hip:-52.2, lean:0.17, arch:6.2, sh:[2.2,-83.7], hd:[1,-0.1], hold:2,
+  nk:[-1.37,-27.24], na:[-7.5,-3], nf:-0.34,
+  fk:[18.33,-35.2], fa:[9,-12], ff:0.16,
+  neb:[1.33,-64.72], nh:[5.5,-50],
+  feb:[-2.67,-65.41], fh:[-5.89,-50.45],
+  cl:[[-4,-80],[-8.5,-71],[-12,-61],[-14,-50]]}
+];
+/* poses 4-7 are 0-3 with the legs and arms swapped; the cloak stays on its own side,
+   which is why this is a swap and not a mirror. */
+function swapPose(P){
+ return {hip:P.hip, lean:P.lean, arch:P.arch, sh:P.sh, hd:P.hd, hold:P.hold,
+  nk:P.fk, na:P.fa, nf:P.ff, fk:P.nk, fa:P.na, ff:P.nf,
+  neb:P.feb, nh:P.fh, feb:P.neb, fh:P.nh,
+  cl:P.cl};
+}
+const WALK = PW.concat(PW.map(swapPose));
+const WALK_HOLDS = WALK.map(p=>p.hold);
+const WALK_DRAWINGS = WALK_HOLDS.reduce((a,b)=>a+b,0);          // 16 drawings
+const WALK_PERIOD = WALK_DRAWINGS/(FPS/TWOS);                    // at 12/s -> 1.333 s
+const WALK_TRAVEL = 68;                                          // from the planted-foot xs
+const SPEED = WALK_TRAVEL/WALK_PERIOD;                           // derived, never dialled in
+
+/* WHERE WE ARE ON THE EXPOSURE SHEET. walkFrac gives the drawing AND how far into
+   its hold we are -- the drawing for what gets painted, the fraction for the things
+   that are continuous rather than drawn (the cloak, which is cloth, not a limb). */
+function walkFrac(ph){
+ ph=((ph%1)+1)%1;
+ let d=ph*WALK_DRAWINGS, i=0;
+ while(d>=WALK_HOLDS[i]){d-=WALK_HOLDS[i];i++;if(i>=WALK.length){i=0;break;}}
+ return [i, WALK_HOLDS[i]?d/WALK_HOLDS[i]:0];
+}
+function walkIndex(ph){return walkFrac(ph)[0];}
+function walkPose(ph){return WALK[walkIndex(ph)];}
+const PRINT_X = PW[0].na[0];        // where the heel lands, straight off the drawing
+/* THE WORLD MOVES WHEN THE DRAWING MOVES, AND NOT BETWEEN. A constant velocity under
+   a timing chart of 3,2,1,2 is what makes a foot slide: during a three-slot hold the
+   ground kept scrolling while the drawn foot stood still. So distance is a STEP
+   function of the exposure sheet -- and because the steps are the drawn spacing, the
+   body genuinely decelerates into each contact and accelerates through the passing.
+   The weight is not an easing curve applied to motion; it IS the motion. */
+const WALK_STEP = WALK_TRAVEL/WALK_DRAWINGS;                     // 4.25 units a slot
+const WALK_CUM=(()=>{const o=[];let acc=0;
+ for(let i=0;i<WALK.length;i++){o.push(acc);acc+=WALK_HOLDS[i]*WALK_STEP;}return o;})();
+function travelAt(ph){
+ const c=Math.floor(ph);
+ return c*WALK_TRAVEL + WALK_CUM[walkIndex(ph-c)];
+}
+
+/* Poses for everything that is not walking. Each one is a decision, not a formula --
+   and each one has been through the same model sheet as the walk. */
+const STAND_A={hip:-52.5, lean:0.045, arch:5.6, sh:[1,-84.1], hd:[0.7,-0.4],
+  nk:[4.97,-28], na:[5,-3], nf:0.1,
+  fk:[-1.16,-27.53], fa:[-6,-3], ff:-0.14,
+  neb:[2.8,-65.19], nh:[4.99,-50.04],
+  feb:[-1.84,-65.97], fh:[-3.46,-50.76],
+  cl:[[-4,-80],[-8,-71],[-10.5,-61],[-11,-50]]};
+const STAND_B={hip:-52.6, lean:0.03, arch:5.2, sh:[0.4,-84.3], hd:[0.45,-0.2],
+  nk:[4.45,-28], na:[4.6,-3], nf:0.1,
+  fk:[-1.35,-27.64], fa:[-5.6,-3], ff:-0.14,
+  neb:[-0.03,-65.3], nh:[4.2,-50.6],
+  feb:[-1.83,-66.42], fh:[-2.98,-51.17],
+  cl:[[-4,-80.6],[-8.6,-71.6],[-11.4,-61.4],[-12.2,-50.4]]};
+const CHARGE=[
+ {hip:-49, lean:0.4, arch:9.5, sh:[9,-79], hd:[3,0.6], hold:1,
+  nk:[17.18,-30.84], na:[20,-6], nf:0.4,
+  fk:[-2.06,-24.09], fa:[-22,-9], ff:-0.75,
+  neb:[-5.6,-66.84], nh:[-16.86,-56.48],
+  feb:[11.34,-63.36], fh:[22,-58],
+  cl:[[-4,-76],[-13,-70],[-22,-64],[-30,-57]]},
+ {hip:-48.5, lean:0.46, arch:10.5, sh:[11,-80], hd:[3.6,1], hold:1,
+  nk:[12.13,-26.64], na:[4,-3], nf:0.05,
+  fk:[-4.01,-23.82], fa:[-27,-14], ff:-1,
+  neb:[-3.53,-67.76], nh:[-14.73,-57.34],
+  feb:[14.93,-61.41], fh:[25,-55],
+  cl:[[-4,-72],[-15,-67],[-26,-61],[-35,-54]]},
+ {hip:-50, lean:0.43, arch:9.8, sh:[10,-80], hd:[3.2,0.5], hold:1,
+  nk:[-0.13,-25], na:[-12,-3], nf:-0.45,
+  fk:[23.31,-40.97], fa:[22,-16], ff:0.35,
+  neb:[-5.19,-68.58], nh:[-16.85,-58.68],
+  feb:[13.47,-62.62], fh:[24,-57],
+  cl:[[-4,-77],[-14,-71],[-24,-65],[-33,-58]]}
+];
+const CLASH={hip:-44, lean:0.5, arch:11, sh:[12.5,-74], hd:[3.9,1.2],
+  nk:[19.99,-28.98], na:[19,-4], nf:0.36,
+  fk:[-2.74,-19.15], fa:[-24,-6], ff:-0.8,
+  neb:[16.41,-55.41], nh:[31,-60],
+  feb:[4.4,-59.49], fh:[15,-54],
+  cl:[[-4,-71],[-14,-66],[-24,-61],[-33,-55]]};
+const AFTER=[
+ {hip:-47, lean:0.44, arch:9, sh:[10,-77], hd:[3,0.8],
+  nk:[-2.3,-22.11], na:[-19,-3.5], nf:-0.55,
+  fk:[15.83,-27.65], fa:[20,-3], ff:0.4,
+  neb:[-5.73,-66.34], nh:[-17.9,-57.07],
+  feb:[5.14,-61.72], fh:[15,-55],
+  cl:[[-4,-74],[-14,-69],[-24,-64],[-32,-58]]},
+ {hip:-51, lean:0.1, arch:6, sh:[2,-82.4], hd:[1,-0.2],
+  nk:[0.77,-26.01], na:[-9,-3], nf:-0.22,
+  fk:[9.8,-28], fa:[10,-3], ff:0.18,
+  neb:[-7.35,-65.86], nh:[-11,-51],
+  feb:[4,-65.5], fh:[7,-51],
+  cl:[[-4,-79],[-8.5,-70],[-11.5,-60],[-12.5,-49]]}
+];
+function lerpPose(A,B,t){
+ const L=(a,b)=>a+(b-a)*t, P2=(a,b)=>[L(a[0],b[0]),L(a[1],b[1])];
+ return {hip:L(A.hip,B.hip),lean:L(A.lean,B.lean),arch:L(A.arch,B.arch),
+  sh:P2(A.sh,B.sh),hd:P2(A.hd,B.hd),
+  nk:P2(A.nk,B.nk),na:P2(A.na,B.na),nf:L(A.nf,B.nf),
+  fk:P2(A.fk,B.fk),fa:P2(A.fa,B.fa),ff:L(A.ff,B.ff),
+  neb:P2(A.neb,B.neb),nh:P2(A.nh,B.nh),feb:P2(A.feb,B.feb),fh:P2(A.fh,B.fh),
+  cl:A.cl.map((q,i)=>P2(q,B.cl[i]))};
+}
+
+/* WHICH DRAWING IS ON SCREEN. The mode picks the cycle, the phase picks the drawing
+   inside it. Nothing here in-betweens a walk: an in-between nobody drew is exactly
+   what made the old figure read as a machine rather than a man. */
+function poseFor(a,ph,idle){
+ if(a.mode==='charge'){
+  const f=((ph%1)+1)%1*CHARGE.length*2;            // a charge burns drawings faster
+  return CHARGE[Math.floor(f)%CHARGE.length];
+ }
+ if(a.mode==='walk')return WALK[walkIndex(ph)];
+ return lerpPose(STAND_A,STAND_B,0.5-0.5*Math.cos((idle||0)*TAU));   // standing still breathes
+}
+function makeActor(seed){
+ return {seed:seed,ph:seed,phD:seed,idle:seed*0.7,idleD:seed*0.7,drawIdx:-1,distD:0,
+  bladeD:-2.0,clothD:null,dist:0,mode:'walk',
+  cloth:[0,1,2,3,4,5,6].map(i=>({x:0,y:-80+i*7,px:0,py:-80+i*7,len:7})),
+  spray:[],puffs:[],prints:[],breathT:0.6+seed,
+  bladeA:-2.0,bladeV:0,bladeTarget:-2.0,
+  onStep:null};
+}
+function clothStep(a,ax,ay,windX,dt){
+ const c=a.cloth;
+ c[0].x=ax;c[0].y=ay;c[0].px=ax;c[0].py=ay;
+ for(let i=1;i<c.length;i++){
+  const p=c[i];
+  const vx=(p.x-p.px)*0.90, vy=(p.y-p.py)*0.90;   // inertia: the cloth lags the body
+  p.px=p.x;p.py=p.y;
+  p.x+=vx+windX*dt*46*(0.5+i/c.length);        // the tail catches more air than the collar
+  p.y+=vy+62*dt;                                   // gravity
+ }
+ for(let k=0;k<4;k++)                              // then the seams hold it together
+  for(let i=1;i<c.length;i++){
+   const A=c[i-1],B=c[i];
+   let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||1;
+   const f=(d-B.len)/d;
+   if(i===1){B.x-=dx*f;B.y-=dy*f;}
+   else{A.x+=dx*f*.5;A.y+=dy*f*.5;B.x-=dx*f*.5;B.y-=dy*f*.5;}
+  }
+}
+function stepActor(a,dt,speedMul,windX){
+ const sm=speedMul===undefined?1:speedMul;
+ a.idle+=dt*0.55;                                  // the clock that runs when nothing else does
+ let dd=0;                                         // how far the world moved THIS frame
+ if(a.mode==='walk'||a.mode==='charge'){
+  const p0=a.ph;
+  a.ph+=dt/WALK_PERIOD*sm;
+  dd=travelAt(a.ph)-travelAt(p0);                  // zero inside a hold, a step at the change
+  a.dist+=dd;
+  /* A heel strikes on the CONTACT drawings -- 0 and 4 -- and nowhere else. The event
+     is the drawing changing, so the snow breaks on the frame the foot is drawn down,
+     not a frame or two either side of it the way a threshold on a curve would. */
+  const idx=walkIndex(a.ph);
+  if(idx!==a.drawIdx){
+   if(idx===0||idx===4){
+    const fx=WALK[idx].na[0];
+    for(let q=0;q<18;q++){
+     const th=-Math.PI*(0.25+rnd()*0.5);
+     const sp=lerp(16,62,rnd())*sm;
+     a.spray.push({x:fx,y:0,d:a.dist,vx:Math.cos(th)*sp*-0.7,vy:Math.sin(th)*sp,
+       r:lerp(0.7,2.6,rnd()),life:1});
+    }
+    a.prints.push({d:a.dist,age:0});
+    if(a.onStep)a.onStep(idx===0?0:1);
+   }
+   a.drawIdx=idx;
+  }
+ }
+ for(const s of a.spray){                          // ballistic, with drag
+  s.vy+=210*dt; s.vx*=1-1.6*dt;
+  s.x+=s.vx*dt-dd;                                 // thrown snow stays where the air left it
+  s.y+=s.vy*dt;
+  s.life-=dt*1.5;
+  if(s.y>0){s.y=0;s.vy*=-0.22;s.vx*=0.5;}
+ }
+ a.spray=a.spray.filter(s=>s.life>0);
+ for(const p of a.prints)p.age+=dt;
+ a.prints=a.prints.filter(p=>p.age<3.2);
+ /* breath: it exists because it is cold, and cold is the whole setting */
+ a.breathT-=dt;
+ if(a.breathT<=0){a.breathT=lerp(1.5,2.4,rnd());
+  a.puffs.push({x:17,y:-88,vx:26,vy:-7,r:1.2,life:1,age:0});}
+ for(const p of a.puffs){
+  p.age+=dt;
+  p.vx+=(windX*26-p.vx)*dt*1.4; p.vy+=(-4-p.vy)*dt*0.8;
+  p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*15;p.life-=dt*0.62;
+ }
+ a.puffs=a.puffs.filter(p=>p.life>0);
+ /* the blade has mass: it swings toward the target, it does not snap to it */
+ a.bladeV+=(a.bladeTarget-a.bladeA)*dt*62-a.bladeV*dt*9;
+ a.bladeA+=a.bladeV*dt;
+}
+/* THE EXPOSURE. Physics runs every frame; what the drawing SHOWS is committed only
+   on the twos. Sixty smooth frames a second is why this read as a screensaver: the
+   stepping is the look, not a limitation anyone worked around. */
+function expose(a){
+ a.phD=a.ph; a.idleD=a.idle; a.distD=a.dist; a.bladeD=a.bladeA;
+ a.clothD=a.cloth.map(q=>({x:q.x,y:q.y}));
+}
+
+function drawActor(a,cx,cy,s,flip,pose){
+ curScale=s;                       // what the eye judges is the subject's real size,
+ const sm=(pose&&pose.smear)||0;   // not the part of it the frame happens to contain
+ if(sm){                                    // trailing multiples: what an animator draws
+  for(let i=sm;i>0;i--){                    // instead of in-betweens nobody can see
+   g.save();g.globalAlpha=0.15+0.09*(sm-i);
+   drawBody(a,cx-(flip?-1:1)*i*30,cy,s,flip,pose);
+   g.restore();
+  }
+ }
+ drawBody(a,cx,cy,s,flip,pose);
+}
+function drawBody(a,cx,cy,s,flip,pose){
+ g.save();
+ g.translate(cx,cy);g.scale(flip?-s:s,s);
+ g.strokeStyle=FIG;g.fillStyle=FIG;g.lineCap='round';g.lineJoin='round';
+
+ const P=pose||{};
+ const PH=(a.phD===undefined?a.ph:a.phD);
+ const K=P.key||poseFor(a,PH,(a.idleD===undefined?a.idle:a.idleD));   // THE DRAWING
+
+ /* Every landmark below is read off K. There is no bob term and no contrapposto
+    formula, because a drawing that needs the hip dropped has the hip DRAWN lower and
+    a drawing that needs the pelvis turned has the knees DRAWN turned. That is the
+    whole of the difference: the numbers are decisions, not consequences. */
+ const hipY=K.hip, shY=K.sh[1], sx=K.sh[0];
+ const span=hipY-shY;                              // this drawing's own torso length
+ const waistY=hipY-span*0.34, chestY=hipY-span*0.78;
+ const neckY=shY-5.5, headY=shY-12;
+ /* the line of action: hip -> lumbar control -> shoulder, as one curve */
+ const ctrl=K.arch;
+ const spineAt=(t)=>{const u=1-t;return 2*t*u*ctrl + t*t*sx;};
+ const LX=(x,y)=>x+spineAt(clamp((hipY-y)/span,0,1.28));
+
+ const seg=(x0,y0,x1,y1,w0,w1,bow,bias)=>{
+  /* STRAIGHT AGAINST CURVE: the +normal edge bows out where the muscle belly is
+     (bias 0 = mid-segment, <0 = toward the root, >0 = toward the tip); the
+     -normal edge stays straight. Two straights is a stick; two curves is a sausage. */
+  const an=Math.atan2(y1-y0,x1-x0), nx=-Math.sin(an), ny=Math.cos(an);
+  const bw=bow||0, bi=0.5+(bias||0);
+  const mx=x0+(x1-x0)*bi, my=y0+(y1-y0)*bi, mw=w0+(w1-w0)*bi;
+  g.beginPath();
+  g.moveTo(x0+nx*w0,y0+ny*w0);
+  g.quadraticCurveTo(mx+nx*(mw+bw*2.1), my+ny*(mw+bw*2.1), x1+nx*w1, y1+ny*w1);
+  g.lineTo(x1-nx*w1,y1-ny*w1);
+  g.lineTo(x0-nx*w0,y0-ny*w0);
+  g.closePath();g.fill();
+  g.beginPath();g.arc(x0,y0,w0,0,TAU);g.fill();
+  g.beginPath();g.arc(x1,y1,w1,0,TAU);g.fill();
+ };
+ const boot=(ax,ay,an,sc)=>{                       // heel, sole, toe: a boot has a profile
+  g.save();g.translate(ax,ay);g.rotate(an*0.6);g.scale(sc,sc);
+  g.beginPath();
+  g.moveTo(-4.4,-2.6);g.lineTo(3.0,-3.0);
+  g.bezierCurveTo(7.4,-2.4, 9.6,-0.6, 10.0,1.6);
+  g.lineTo(9.4,3.0);g.lineTo(-4.8,3.0);
+  g.bezierCurveTo(-6.2,2.6, -6.2,-1.4, -4.4,-2.6);
+  g.closePath();g.fill();g.restore();
+ };
+ const legF=(kx,ky,ax,ay,fang,wHip,wKnee,wAnk,bs,hipOff)=>{
+  const hx0=hipOff||0;
+  seg(hx0,hipY,kx,ky,wHip,wKnee,1.5,-0.16);        // thigh: quadriceps high, back straight
+  seg(kx,ky,ax,ay,wKnee*1.04,wAnk,1.7,-0.22);      // calf: belly just under the knee
+  boot(ax,ay,fang,bs);
+ };
+ const armF=(ex,ey,tx,ty,wSh,wEl,wWr,shOff)=>{
+  const ox=LX(0,shY+3)+(shOff||0), oy=shY+3;
+  seg(ox,oy,ex,ey,wSh,wEl,0.8,-0.22);              // upper arm: deltoid at the root
+  seg(ex,ey,tx,ty,wEl*0.98,wWr,0.7,-0.18);         // forearm: belly near the elbow
+  g.beginPath();g.arc(tx,ty,wWr*1.5,0,TAU);g.fill();
+  return [tx,ty];
+ };
+ /* The pelvis and the ribcage turn against each other -- but read off this drawing's
+    own feet and hands rather than dialled from a sine, so a pose that was drawn with
+    the turn already in it does not get a second helping of it. */
+ const hipN=clamp(K.na[0]*0.055,-2.6,2.6), hipF=clamp(K.fa[0]*0.055,-2.6,2.6);
+ const shN=clamp(K.nh[0]*0.030,-2.2,2.2), shF=clamp(K.fh[0]*0.030,-2.2,2.2);
+
+ /* prints stay in the world */
+ g.save();g.fillStyle=SNOW_LO;
+ for(const q of a.prints){
+  const k=1-q.age/3.2, x=PRINT_X-(a.distD-q.d);
+  if(x<-260)continue;
+  g.globalAlpha=k*0.5;
+  g.beginPath();g.ellipse(x,2,8.5,3,0,0,TAU);g.fill();
+ }
+ g.restore();
+
+ /* THE COAT. The silhouette is AUTHORED -- four points, drawn, in K.cl -- and the
+    simulation contributes only the flutter: how far the verlet chain has bowed away
+    from its own chord, laid sideways onto the drawn spine. Shape by hand, life by
+    physics. A cloak is cloth; it is the one thing on this figure that should not be
+    a held drawing. */
+ const c=a.clothD||a.cloth, N=c.length;
+ const bowAt=(t)=>{
+  const dx=c[N-1].x-c[0].x, dy=c[N-1].y-c[0].y, L=Math.hypot(dx,dy)||1;
+  const off=(j)=>((c[j].x-c[0].x)*(-dy/L)+(c[j].y-c[0].y)*(dx/L));
+  const f=t*(N-1), i=clamp(Math.floor(f),0,N-2), u=f-i;
+  return off(i)*(1-u)+off(i+1)*u;
+ };
+ /* The cloak's LENGTH is a costume constant, not a per-drawing decision, so the drawn
+    spine is carried on along its own last direction until it reaches mid-thigh. And
+    its collar is pulled onto the shoulder of this drawing: a cloak that starts three
+    units off the shoulder reads as a bag someone is carrying. */
+ const cl0=K.cl, L3=cl0[cl0.length-1], L2p=cl0[cl0.length-2];
+ const CL=cl0.concat([[L3[0]+(L3[0]-L2p[0])*0.85, L3[1]+(L3[1]-L2p[1])*1.05]]);
+ const pinX=(sx-2.4)-CL[0][0], pinY=(shY+2.5)-CL[0][1];
+ const spine=CL.map((q,i)=>{
+  const t=i/(CL.length-1), w=(1-t)*(1-t);
+  return {x:q[0]+pinX*w+bowAt(t)*0.8*t, y:q[1]+pinY*w};
+ });
+ /* A cloak FLARES. Narrow at the collar and wide at the hem is the whole reason the
+    shape reads as cloth and not as a second arm hanging off the shoulder -- which is
+    exactly what it read as when collar and hem were the same width. */
+ const edge=(sgn)=>{
+  const M=spine.length;
+  const pts=spine.map((q,i)=>{
+   const t=i/(M-1);
+   const w=sgn>0 ? lerp(3.4,3.2,t) : -lerp(4.5,12.5,Math.pow(t,0.75));
+   return [q.x+w,q.y];
+  });
+  return sgn>0?pts:pts.reverse();
+ };
+ const hemA=edge(1), hemB=edge(-1);
+ {const A=hemA[hemA.length-1], B=hemB[0];      // the split hem, lifted between the corners
+  hemA.push([(A[0]+B[0])/2, (A[1]+B[1])/2-6.5]);}
+ const path=hemA.concat(hemB);
+ g.beginPath();g.moveTo(path[0][0],path[0][1]);
+ for(let i=1;i<path.length-1;i++){
+  const [x0,y0]=path[i],[x1,y1]=path[i+1];
+  g.quadraticCurveTo(x0,y0,(x0+x1)/2,(y0+y1)/2);
+ }
+ g.closePath();g.fill();
+
+ legF(K.fk[0],K.fk[1],K.fa[0],K.fa[1],K.ff,5.0,3.7,2.2,0.92,hipF);   // far leg
+ armF(K.feb[0],K.feb[1],K.fh[0],K.fh[1],3.3,2.5,1.7,shF);           // far arm
+
+ /* TORSO. Deltoid, ribcage, waist, pelvis — a trapezoid reads as a sandwich board. */
+ g.beginPath();
+ g.moveTo(LX(13.6,shY),shY+1);
+ g.bezierCurveTo(LX(14.6,shY-1),shY-2, LX(12.4,shY-3),shY-4, LX(9.0,shY-4),shY-4.5);
+ g.lineTo(LX(-9.0,shY-4),shY-4.5);
+ g.bezierCurveTo(LX(-12.4,shY-3),shY-4, LX(-14.6,shY-1),shY-2, LX(-13.6,shY),shY+1);
+ g.bezierCurveTo(LX(-13.0,chestY),chestY, LX(-6.6,waistY),waistY, LX(-8.8,hipY-3),hipY-3);
+ g.lineTo(LX(-9.4,hipY),hipY+3);
+ g.lineTo(LX(9.4,hipY),hipY+3);
+ g.lineTo(LX(8.6,hipY-3),hipY-3);
+ g.bezierCurveTo(LX(6.6,waistY),waistY, LX(13.0,chestY),chestY, LX(13.6,shY),shY+1);
+ g.closePath();g.fill();
+
+ /* sash, with a hanging end that swings */
+ g.beginPath();
+ g.moveTo(LX(-9.2,waistY+2),waistY+2);g.lineTo(LX(9.2,waistY+2),waistY+2);
+ g.lineTo(LX(8.8,waistY+6),waistY+6);g.lineTo(LX(-8.8,waistY+6),waistY+6);
+ g.closePath();g.fill();
+ {const sw2=K.fa[0]*0.14;                          // it trails the leg that is back
+  g.beginPath();
+  g.moveTo(LX(-7.5,waistY+4),waistY+4);
+  g.bezierCurveTo(LX(-9-sw2,waistY+12),waistY+12, LX(-8-sw2*1.6,waistY+19),waistY+19,
+                  LX(-10-sw2*2,waistY+25),waistY+25);
+  g.lineTo(LX(-6.4-sw2*1.7,waistY+24),waistY+24);
+  g.bezierCurveTo(LX(-5-sw2*1.2,waistY+17),waistY+17, LX(-4.6,waistY+11),waistY+11,
+                  LX(-3.6,waistY+4),waistY+4);
+  g.closePath();g.fill();}
+
+ if(!P.drawn){                                     // scabbard, when the blade is put away
+  g.save();
+  seg(LX(-4,hipY-2),hipY-2, LX(-23,hipY+9),hipY+9, 2.4,1.4);
+  g.restore();
+ }
+
+ legF(K.nk[0],K.nk[1],K.na[0],K.na[1],K.nf,5.6,4.1,2.4,1.0,hipN);   // near leg
+ const hand=armF(K.neb[0],K.neb[1],K.nh[0],K.nh[1],4.0,3.0,2.0,shN); // near arm, and the grip
+
+ /* neck: it angles forward out of the shoulders, it is not a post.
+    The head's offset from the neck is DRAWN (K.hd), so the lag that used to be a
+    spring is now a decision made once per pose -- and it cannot run away from the
+    neck, because nothing is integrating. */
+ const HD=K.hd[0], HY=K.hd[1];
+ /* A neck 3.1 wide under a hood 13 wide is a mushroom. Trapezius first -- the slope
+    from the shoulder up into the skull is the shape that makes a head belong to a
+    body -- then the neck itself, and only then the hood on top of both. */
+ g.beginPath();
+ g.moveTo(LX(-11.5,shY-2),shY-2.5);
+ g.quadraticCurveTo(LX(-6.0,shY-4),shY-5.5, LX(-3.4,neckY+1)+HD*0.5,neckY+1.5);
+ g.lineTo(LX(4.2,neckY+1)+HD*0.5,neckY+1.5);
+ g.quadraticCurveTo(LX(7.4,shY-4),shY-5.5, LX(12.2,shY-2),shY-2.5);
+ g.closePath();g.fill();
+ seg(LX(-0.9,shY),shY+1, LX(1.6,neckY)+HD,neckY-0.5+HY, 4.3,3.7,0.8,0);
+
+ /* HOOD. Peak forward, drape behind — the one costume shape that has to read at 40 px.
+    It tilts with the pose's lean: a man leaning into weather leads with his head. */
+ g.save();
+ {const hax=LX(0,headY)+HD;
+  g.translate(0,HY);
+  g.translate(hax,headY);g.rotate((K.lean||0)*0.42);g.translate(-hax,-headY);}
+ g.beginPath();
+ const HX=(x,y)=>LX(x,y)+HD;
+ g.moveTo(HX(-4.4,neckY+1.4),neckY+1.4);
+ g.bezierCurveTo(HX(-5.6,headY+2.4),headY+2.4, HX(-5.2,headY-2.6),headY-2.6, HX(-1.6,headY-4.4),headY-4.4);
+ g.bezierCurveTo(HX(2.2,headY-5.5),headY-5.5, HX(5.6,headY-2.8),headY-2.8, HX(6.1,headY+1.1),headY+1.1);
+ g.bezierCurveTo(HX(6.4,headY+4.2),headY+4.2, HX(4.6,neckY+1.4),neckY+1.4, HX(2.6,neckY+2.2),neckY+2.2);
+ g.lineTo(HX(-4.4,neckY+1.4),neckY+1.4);
+ g.closePath();g.fill();
+ g.beginPath();                                    // the drape at the back of the hood
+ g.moveTo(HX(-3.4,neckY-1.4),neckY-1.4);
+ g.bezierCurveTo(HX(-8.6,neckY+2.4),neckY+2.4, HX(-11.4,shY+1.2),shY+1.2, HX(-10.2,shY+6.5),shY+6.5);
+ g.bezierCurveTo(HX(-6.2,shY+5.2),shY+5.2, HX(-3.4,neckY+3.0),neckY+3.0, HX(-1.6,neckY-0.4),neckY-0.4);
+ g.closePath();g.fill();
+ g.restore();
+
+ if(P.drawn){
+  const A=(a.bladeD===undefined?a.bladeA:a.bladeD), L=P.bladeLen||48;
+  const tipX=hand[0]+Math.cos(A)*L, tipY=hand[1]+Math.sin(A)*L;
+  const nx=-Math.sin(A), ny=Math.cos(A);
+  const bx=hand[0]+Math.cos(A)*7, by=hand[1]+Math.sin(A)*7;
+  g.beginPath();                                   // blade, tapered to a point
+  g.moveTo(bx+nx*2.2,by+ny*2.2);
+  g.lineTo(tipX+nx*0.5,tipY+ny*0.5);
+  g.lineTo(tipX-nx*0.4,tipY-ny*0.4);
+  g.lineTo(bx-nx*2.2,by-ny*2.2);
+  g.closePath();g.fill();
+  g.beginPath();                                   // guard
+  g.ellipse(hand[0]+Math.cos(A)*5.5,hand[1]+Math.sin(A)*5.5,1.7,6.2,A,0,TAU);g.fill();
+  seg(hand[0]-Math.cos(A)*1,hand[1]-Math.sin(A)*1,
+      hand[0]-Math.cos(A)*10,hand[1]-Math.sin(A)*10, 2.0,2.4);   // grip + pommel
+ }
+
+ g.save();g.fillStyle='#ffffff';
+ for(const q of a.spray){g.globalAlpha=clamp(q.life,0,1)*0.9;
+  g.beginPath();g.arc(q.x,q.y,q.r,0,TAU);g.fill();}
+ g.restore();
+ g.save();g.fillStyle='#ffffff';
+ for(const q of a.puffs){g.globalAlpha=clamp(q.life,0,1)*clamp(q.age/0.18,0,1)*0.34;
+  g.beginPath();g.arc(LX(0,headY)+q.x,q.y,q.r,0,TAU);g.fill();}
+ g.restore();
+ g.restore();
+}
+
+/* ===================== THE DROP ===================== */
+const drop={y:0,v:0,landed:false,marks:[]};
+function resetDrop(){drop.y=0;drop.v=0;drop.landed=false;drop.marks.length=0;}
+function stepDrop(dt,active){
+ if(!active)return;
+ if(!drop.landed){
+  drop.v+=1500*dt;drop.y+=drop.v*dt;            // free fall, not an eased tween
+  if(drop.y>560){
+   drop.landed=true;
+   for(let q=0;q<9;q++){
+    const th=-Math.PI*(0.15+rnd()*0.7), sp=lerp(40,170,rnd());
+    drop.marks.push({x:0,y:0,vx:Math.cos(th)*sp,vy:Math.sin(th)*sp,
+      r:lerp(1.6,5,rnd()),rest:false});
+   }
+  }
+ }
+ for(const m of drop.marks){
+  if(m.rest)continue;
+  m.vy+=1300*dt;m.vx*=1-2.2*dt;m.x+=m.vx*dt;m.y+=m.vy*dt;
+  if(m.y>0){m.y=0;m.rest=true;}
+ }
+}
+
+/* ===================== SHOTS ===================== */
+let T=0,playing=true,last=performance.now(),shake=0;
+let curScale=1;   // the AUTHORED subject scale of the current shot
+const hero=makeActor(0), other=makeActor(0.37);
+function resetAll(){
+ hero.ph=0;other.ph=0.37;hero.phD=0;other.phD=0.37;
+ hero.clothD=null;other.clothD=null;hero.bladeD=-2.0;other.bladeD=-2.0;
+ hero.dist=0;other.dist=0;hero.distD=0;other.distD=0;
+ for(const a of [hero,other]){a.spray.length=0;a.puffs.length=0;a.prints.length=0;
+  /* the cloth kept its positions across a reset, so the same frame rendered twice
+     came back with a differently-hanging cloak -- 73 pixels, and the only thing in
+     the piece that was not reproducible. */
+  a.cloth.forEach((q,i)=>{q.x=0;q.y=-80+i*7;q.px=0;q.py=-80+i*7;});
+  a.bladeA=-2.0;a.bladeV=0;a.bladeTarget=-2.0;a.mode='walk';a.breathT=0.6;
+  a.drawIdx=-1;a.idle=a.seed*0.7;a.idleD=a.idle;a.distD=0;}
+ resetDrop();
+}
+
+function sim(dt){
+ let i=0;for(let j=0;j<SHOTS.length;j++)if(T>=S[j])i=j;
+ const sh=SHOTS[i],lt=T-S[i],u=clamp(lt/sh.d,0,1),k=sh.k;
+
+ const running=(k==='far'||k==='walk'||k==='boot');
+ const charging=(k==='charge');
+ const post=(k==='after');
+ hero.mode=charging?'charge':running?'walk':'stand';
+ other.mode=charging?'charge':'stand';
+ hero.bladeTarget = charging?-2.85 : (k==='clash')?-0.55 : (k==='after')?2.45 : -2.05;
+ other.bladeTarget = hero.bladeTarget;
+ const windX=k==='charge'?1.6:1.0;
+ stepActor(hero,dt,charging?1.9:1,windX*0.02);
+ stepActor(other,dt,charging?1.9:0,windX*0.02);
+ /* The cloak hangs off the SHOULDER IN THE DRAWING, which is why it now gets six and
+    a half units of travel a stride instead of one. Between drawings it is eased, not
+    stepped: the figure is on twos, the cloth is cloth. */
+ const anch=(a)=>{
+  if(a.mode==='walk'){
+   const [i,u]=walkFrac(a.ph), A=WALK[i].sh, B=WALK[(i+1)%WALK.length].sh;
+   return [lerp(A[0],B[0],u), lerp(A[1],B[1],u)+1];
+  }
+  const K=poseFor(a,a.ph,a.idle);
+  return [K.sh[0],K.sh[1]+1];
+ };
+ const appar=(a,base)=>{                            // apparent wind = weather + own speed
+  const moving=(a.mode==='walk'||a.mode==='charge');
+  const own=moving?-(SPEED*(a.mode==='charge'?1.9:1))*0.0062:0;
+  return base*0.62+own+Math.sin(T*3.1+a.ph*2.3)*0.11;   // and the air is not smooth
+ };
+ {const [ax,ay]=anch(hero);clothStep(hero,ax,ay,appar(hero,charging?-0.55:-0.26),dt);}
+ {const [ax,ay]=anch(other);clothStep(other,ax,ay,appar(other,-0.26),dt);}
+
+ stepDrop(dt,k==='drop');
+}
+function shotNow(){let i=0;for(let j=0;j<SHOTS.length;j++)if(T>=S[j])i=j;return i;}
+function draw(){
+ const i=shotNow(),sh=SHOTS[i],lt=T-S[i],u=clamp(lt/sh.d,0,1),k=sh.k;
+ g.setTransform(1,0,0,1,0,0);
+ if(shake>0){const m=shake*22;
+  /* the shake is hashed from the frame number, not drawn from the shared stream:
+     Math.random() made the same frame render differently twice, and pulling from the
+     seeded RNG inside draw() would have desynced it from the simulation. */
+  const hz=(k)=>{const v=Math.sin(frameNo*12.9898+k*78.233)*43758.5453;return v-Math.floor(v)-0.5;};
+  g.setTransform(1,0,0,1,hz(1)*m,hz(2)*m);
+  shake=Math.max(0,shake-0.085);}
+
+ const sky=g.createLinearGradient(0,0,0,H);
+ sky.addColorStop(0,SNOW_HI);sky.addColorStop(.6,SNOW);sky.addColorStop(1,SNOW_LO);
+ g.fillStyle=sky;g.fillRect(-40,-40,W+80,H+80);
+
+ if(k==='far'){
+  ground(880,true,hero.distD*2.0);
+  const p=ease(u), s=lerp(1.0,2.3,p), x=lerp(W*0.63,W*0.56,p), y=lerp(838,874,p);
+  g.globalAlpha=lerp(0.20,0.94,ease(clamp((u-0.10)/0.6,0,1)));
+  drawActor(hero,x,y,s,false,null);
+  g.globalAlpha=1;
+  haze(lerp(0.58,0.18,p));snow(T,1.0);
+ }
+ else if(k==='walk'){
+  ground(930,true,hero.distD*5.6);
+  drawActor(hero,W*0.47,954,5.6,false,null);
+  haze(0.10);snow(T,1.0,false,1.2);
+ }
+ else if(k==='boot'){
+  /* low angle, knee down. Three references — two legs, the drift line, the snow they
+     break — so the eye has something to measure against. */
+  ground(1500,true,hero.distD*19.5);
+  g.save();
+  curScale=19.5;
+  g.translate(W*0.5,1560);g.scale(19.5,19.5);  // a real step in
+  g.strokeStyle=FIG;g.fillStyle=FIG;g.lineCap='round';g.lineJoin='round';
+  const KB=poseFor(hero,(hero.phD===undefined?hero.ph:hero.phD),hero.idleD);
+  const hipY=KB.hip;
+  const legF=(kx,ky,ax,ay,w)=>{
+   g.lineWidth=w;g.beginPath();g.moveTo(0,hipY);g.lineTo(kx,ky);g.lineTo(ax,ay);g.stroke();
+   g.lineWidth=w*0.78;g.beginPath();g.moveTo(ax,ay);g.lineTo(ax+8.5,ay+0.5);g.stroke();
+  };
+  legF(KB.fk[0],KB.fk[1],KB.fa[0],KB.fa[1],8);
+  g.beginPath();g.moveTo(-11,hipY-2);g.lineTo(11,hipY-2);
+  g.lineTo(11,hipY+6);g.lineTo(-11,hipY+6);g.closePath();g.fill();
+  legF(KB.nk[0],KB.nk[1],KB.na[0],KB.na[1],9);
+  g.save();g.fillStyle='#ffffff';
+  for(const q of hero.spray){g.globalAlpha=clamp(q.life,0,1)*0.9;
+   g.beginPath();g.arc(q.x,q.y,q.r,0,TAU);g.fill();}
+  g.restore();
+  g.save();g.fillStyle=SNOW_LO;
+  for(const q of hero.prints){
+   const kk=1-q.age/3.2, x=PRINT_X-(hero.distD-q.d);
+   if(x<-120)continue;
+   g.globalAlpha=kk*0.5;g.beginPath();g.ellipse(x,2,8.5,3,0,0,TAU);g.fill();
+  }
+  g.restore();
+  g.restore();
+  haze(0.04);snow(T,0.7,false,1.5);
+ }
+
+ else if(k==='meet'){
+  ground(900);
+  drawActor(hero,W*0.30,932,4.7,false,{drawn:true});
+  g.globalAlpha=lerp(0.28,0.96,ease(clamp(lt/0.9,0,1)));
+  drawActor(other,W*0.72,932,4.7,true,{drawn:true});
+  g.globalAlpha=1;
+  haze(0.14);snow(T,1.2);
+ }
+ else if(k==='other'){
+  ground(1340);
+  drawActor(other,W*0.41,1900,14.0,true,{drawn:true});   // 1.17x -> 1.59x
+  haze(0.05);snow(T,1.2,false,1.5);
+ }
+ else if(k==='charge'){
+  ground(900);
+  const p=u*u;                                       // accelerating, not gliding
+  const sm=lt>0.16?3:lt>0.08?2:1;                    // more multiples the faster he goes
+  speedLines(0.16+u*0.5);
+  drawActor(hero,lerp(W*0.21,W*0.435,p),934,4.9,false,{drawn:true,bladeLen:42,smear:sm});
+  drawActor(other,lerp(W*0.81,W*0.585,p),934,4.9,true,{drawn:true,bladeLen:42,smear:sm});
+  haze(0.08);snow(T,2.8,false,1.0);
+ }
+ else if(k==='clash'){
+  /* four frames. Bodies low, blades meeting, everything about to break. */
+  ground(900);
+  // MATCHES the charge: one action, one size
+  drawActor(hero,W*0.452,934,4.9,false,{key:CLASH,drawn:true,bladeLen:58});
+  drawActor(other,W*0.568,934,4.9,true,{key:CLASH,drawn:true,bladeLen:58});
+  snow(T,2.8,true);
+ }
+ else if(k==='impactA'){
+  /* インパクトフレーム — three frames of graphic, not a picture of two men */
+  g.fillStyle='#ffffff';g.fillRect(-40,-40,W+80,H+80);
+  g.save();g.strokeStyle=FIG;g.lineCap='round';
+  const cxp=W*0.51,cyp=H*0.47;
+  for(let q=0;q<52;q++){                             // 集中線 converging on the hit
+   const a2=q*0.1209+q*q*0.0021, r0=lerp(110,260,(q*0.37)%1);
+   g.lineWidth=lerp(3,17,(q*0.611)%1);
+   g.beginPath();g.moveTo(cxp+Math.cos(a2)*r0,cyp+Math.sin(a2)*r0*0.62);
+   g.lineTo(cxp+Math.cos(a2)*1500,cyp+Math.sin(a2)*1500*0.62);g.stroke();
+  }
+  g.restore();
+  g.save();g.fillStyle=FIG;                          // the two, fused into one black mass
+  g.beginPath();g.ellipse(cxp,cyp,138,96,0.1,0,TAU);g.fill();g.restore();
+ }
+ else if(k==='impactB'){
+  /* two frames, inverted. The eye is still holding the white one. */
+  g.fillStyle=FIG;g.fillRect(-40,-40,W+80,H+80);
+  g.save();g.strokeStyle='#ffffff';g.lineWidth=22;g.lineCap='round';
+  g.beginPath();g.moveTo(W*0.10,H*0.74);g.lineTo(W*0.92,H*0.23);g.stroke();
+  g.lineWidth=7;
+  g.beginPath();g.moveTo(W*0.22,H*0.20);g.lineTo(W*0.44,H*0.40);g.stroke();
+  g.beginPath();g.moveTo(W*0.78,H*0.80);g.lineTo(W*0.58,H*0.60);g.stroke();
+  g.restore();
+ }
+ else if(k==='after'){
+  ground(900);
+  const settle=1-Math.exp(-lt*2.6);                  // slow enough to SEE it bleed off
+  const ov=Math.sin(lt*11)*Math.exp(-lt*3.4)*13;
+  /* asymmetry is what sells a pass: one ends deep in the follow-through, one upright */
+  drawActor(hero,W*0.705+ov,934,4.9,false,
+    {key:lerpPose(AFTER[0],AFTER[1],settle),drawn:true,bladeLen:42});
+  drawActor(other,W*0.295-ov*0.6,934,4.9,true,
+    {key:lerpPose(AFTER[0],AFTER[1],clamp(settle*1.18,0,1)),drawn:true,bladeLen:42});
+  haze(0.08);snow(T,lerp(2.6,1.0,settle),false,1.0);
+ }
+ else if(k==='drop'){
+  ground(1010);
+  g.globalAlpha=0.74;
+  drawActor(hero,W*0.82,1046,7.4,false,{drawn:true});   // push in: the DROP is the subject
+  drawActor(other,W*0.18,1046,7.4,true,{drawn:true});
+  g.globalAlpha=1;
+  const bx=W*0.5, by=470;
+  if(!drop.landed&&lt>0.2){
+   const st=clamp(drop.v/900,0,1);
+   g.fillStyle=BLOOD;g.beginPath();
+   g.ellipse(bx,by+drop.y,lerp(18,11,st),lerp(18,52,st),0,0,TAU);g.fill();
+  }
+  if(drop.landed){
+   g.fillStyle=BLOOD;
+   g.beginPath();g.ellipse(bx,1062,56,20,0,0,TAU);g.fill();
+   for(const m of drop.marks){
+    g.beginPath();g.ellipse(bx+m.x,1062+m.y*0.34,m.r*2.1,m.r*1.5,0,0,TAU);g.fill();
+   }
+  }
+  haze(0.05);snow(T,0.6,false,1.4);
+ }
+ else if(k==='backs'){
+  ground(900);
+  drawActor(hero,W*0.415,932,4.7,true,{drawn:true});
+  drawActor(other,W*0.585,932,4.7,false,{drawn:true});
+  haze(0.13);snow(T,0.9);
+ }
+ else if(k==='alone'){
+  ground(900);
+  const fade=ease(clamp((lt-0.7)/2.0,0,1));
+  g.globalAlpha=1-fade;
+  drawActor(other,W*0.585+fade*80,932,4.7,false,{drawn:true});
+  g.globalAlpha=1;
+  drawActor(hero,W*0.415,932,4.7,true,{drawn:true});
+  haze(lerp(0.13,0.36,fade));snow(T,0.7,false,1+fade*0.5);
+  if(lt>2.2){
+   const a=ease(clamp((lt-2.2)/1.0,0,1))*0.82;
+   g.save();g.globalAlpha=a;g.fillStyle=FIG;g.textAlign='center';
+   g.font='300 80px "Cormorant Garamond", Georgia, serif';
+   g.fillText('O‘ZING BILAN',W/2,198);
+   g.font='500 38px "IBM Plex Mono", monospace';g.globalAlpha=a*0.5;
+   g.fillText('W H I T E O U T',W/2,260);
+   g.restore();
+  }
+ }
+ g.setTransform(1,0,0,1,0,0);
+}
+
+/* ===================== SOUND ===================== */
+let AC=null,master,lim,soundOn=false,nb=null;
+function gn(v){const n=AC.createGain();n.gain.value=v;return n;}
+function bq(t,f,q){const n=AC.createBiquadFilter();n.type=t;n.frequency.value=f;n.Q.value=q;return n;}
+function initAudio(){
+ AC=new (window.AudioContext||window.webkitAudioContext)();
+ lim=AC.createDynamicsCompressor();
+ lim.threshold.value=-3;lim.knee.value=0;lim.ratio.value=14;lim.attack.value=.002;lim.release.value=.14;
+ master=gn(0);master.connect(lim);lim.connect(AC.destination);
+ const n=Math.floor(AC.sampleRate*3),d=new Float32Array(n);
+ for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+ nb=AC.createBuffer(1,n,AC.sampleRate);nb.copyToChannel(d,0);
+}
+function nz(t,dur,peak,type,f,q,pan,f2){
+ const s=AC.createBufferSource(),fl=bq(type,f,q),e=gn(0);
+ s.buffer=nb;s.loop=true;s.playbackRate.value=0.8+rnd()*0.5;
+ if(f2){fl.frequency.setValueAtTime(f,t);fl.frequency.exponentialRampToValueAtTime(f2,t+dur*0.85);}
+ e.gain.setValueAtTime(0,t);
+ e.gain.linearRampToValueAtTime(peak,t+Math.min(0.012,dur*0.18));
+ e.gain.exponentialRampToValueAtTime(0.0004,t+dur);
+ const p=AC.createStereoPanner?AC.createStereoPanner():null;
+ if(p){p.pan.value=pan||0;s.connect(fl).connect(e).connect(p).connect(master);}
+ else s.connect(fl).connect(e).connect(master);
+ s.start(t,Math.random()*2);s.stop(t+dur+0.06);
+}
+function wind(t,dur,peak){
+ const s=AC.createBufferSource(),fl=bq('bandpass',420,2.9),e=gn(0);
+ s.buffer=nb;s.loop=true;s.playbackRate.value=0.45;
+ const l=AC.createOscillator(),ld=gn(150);
+ l.frequency.value=0.11;l.connect(ld).connect(fl.frequency);l.start(t);l.stop(t+dur+0.2);
+ e.gain.setValueAtTime(0,t);
+ e.gain.linearRampToValueAtTime(peak,t+1.2);
+ e.gain.setValueAtTime(peak,t+dur-1.4);
+ e.gain.linearRampToValueAtTime(0.0005,t+dur);
+ s.connect(fl).connect(e).connect(master);s.start(t,Math.random());s.stop(t+dur+0.1);
+}
+/* the footfall now fires from the FOOT, at the frame the heel actually strikes */
+function crunch(lvl,pan){
+ if(!soundOn||!AC)return;const t=AC.currentTime+0.005;
+ nz(t,0.075,lvl,'lowpass',560,1.0,pan);
+ nz(t+0.004,0.05,lvl*0.6,'bandpass',2100,1.3,pan);
+}
+function breathS(t,lvl){nz(t,0.42,lvl,'bandpass',560,1.6,0,900);}
+function steel(t,lvl){
+ [2380,3170,4510,5960,7720].forEach((f,i)=>{
+  const o=AC.createOscillator(),e=gn(0);
+  o.frequency.value=f*(1+(rnd()-.5)*0.01);
+  e.gain.setValueAtTime(0,t);
+  e.gain.linearRampToValueAtTime(lvl*(1-i*0.16),t+0.002);
+  e.gain.exponentialRampToValueAtTime(0.0004,t+1.5-i*0.2);
+  o.connect(e).connect(master);o.start(t);o.stop(t+1.6);
+ });
+ nz(t,0.10,lvl*1.2,'highpass',3200,0.7,0);
+ nz(t,0.5,lvl*0.5,'bandpass',900,1.2,0);
+}
+function drone(t,dur,f0,f1,lvl){
+ const o=AC.createOscillator(),o2=AC.createOscillator(),e=gn(0),fl=bq('lowpass',300,0.8);
+ o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+dur*0.8);
+ o2.type='triangle';
+ o2.frequency.setValueAtTime(f0*2.02,t);o2.frequency.exponentialRampToValueAtTime(f1*2.02,t+dur*0.8);
+ e.gain.setValueAtTime(0.0005,t);
+ e.gain.exponentialRampToValueAtTime(lvl,t+dur*0.55);
+ e.gain.exponentialRampToValueAtTime(0.0005,t+dur);
+ o.connect(fl);o2.connect(gn(0.28)).connect(fl);fl.connect(e).connect(master);
+ o.start(t);o2.start(t);o.stop(t+dur+0.1);o2.stop(t+dur+0.1);
+}
+function score(t0){
+ const at=s=>t0+s;
+ wind(at(0),TOTAL,0.085);
+ drone(at(0),9.5,34,46,0.10);
+ breathS(at(2.1),0.055);breathS(at(4.3),0.075);breathS(at(6.0),0.10);
+ nz(at(6.85),0.9,0.10,'bandpass',300,1.4,0,120);
+ drone(at(6.8),3.1,44,70,0.20);
+ nz(at(9.0),0.42,0.18,'bandpass',700,1.1,0,2400);
+ /* 9.50 .. 9.80 : nothing. The gap is the loudest thing here. */
+ steel(at(9.59),0.42);
+ drone(at(9.59),2.4,96,30,0.42);
+ nz(at(9.59),0.7,0.24,'lowpass',2000,0.9,0,200);
+ nz(at(9.84),1.5,0.07,'bandpass',1800,2.2,0,600);
+ breathS(at(10.6),0.11);breathS(at(11.4),0.09);
+ drone(at(12.9),4.0,40,32,0.14);
+ breathS(at(13.6),0.07);
+ wind(at(15.3),4.0,0.05);
+}
+function arm(){if(soundOn&&AC)score(AC.currentTime+0.08);}
+hero.onStep=i=>{const k=SHOTS[(()=>{let j=0;for(let q=0;q<SHOTS.length;q++)if(T>=S[q])j=q;return j;})()].k;
+ if(k==='far'||k==='walk'||k==='boot')crunch(lerp(0.10,0.30,T/6.8),i?0.22:-0.22);
+ else if(k==='charge')crunch(0.26,i?0.3:-0.3);};
+other.onStep=()=>{};
+
+/* ===================== LOOP ===================== */
+const shotsEl=document.getElementById('shots');
+const bars=SHOTS.map(()=>{const i=document.createElement('i'),b=document.createElement('b');
+ i.appendChild(b);shotsEl.appendChild(i);return b;});
+let frameNo=0, acc=0;
+function stepOnce(){                        // one authored frame at 24
+ T+=DT;frameNo++;
+ if(frameNo%TWOS===0){expose(hero);expose(other);}   // the twos
+ if(T>=TOTAL){T=TOTAL;playing=false;}
+}
+function frame(now){
+ const el=Math.min(0.1,(now-last)/1000);last=now;
+ if(playing){acc+=el;let guard=0;
+  while(acc>=DT&&guard++<6){acc-=DT;stepOnce();sim(DT);}
+ }
+ for(let i=0;i<SHOTS.length;i++){
+  const d=T-S[i];
+  if(SHOTS[i].k==='impactA'&&d>=0&&d<0.05)shake=1;
+  if(SHOTS[i].k==='after'&&d>=0&&d<0.05)shake=0.5;
+  bars[i].style.width=clamp((T-S[i])/SHOTS[i].d,0,1)*100+'%';
+ }
+ draw();
+ requestAnimationFrame(frame);
+}
+function restart(){T=0;frameNo=0;acc=0;playing=true;last=performance.now();reseed();resetAll();
+ if(soundOn&&AC){AC.resume();arm();}}
+
+document.getElementById('play').addEventListener('click',restart);
+const bSnd=document.getElementById('snd');
+bSnd.addEventListener('click',()=>{
+ if(!AC)initAudio();
+ soundOn=!soundOn;
+ bSnd.textContent=soundOn?'Ovoz: yoniq':"Ovoz: o'chiq";
+ bSnd.setAttribute('aria-pressed',String(soundOn));
+ if(soundOn){AC.resume();master.gain.setTargetAtTime(0.9,AC.currentTime,0.05);restart();}
+ else master.gain.setTargetAtTime(0,AC.currentTime,0.05);
+});
+/* A linear scan: reset once, then step and MEASURE every frame. __frameTo restarts
+   from zero each call, so scanning with it is O(n^2); this is O(n) and makes a
+   whole-piece per-frame audit cheap enough to run every time. */
+window.__scanAll=(step)=>{
+ step=step||4;
+ playing=false;T=0;frameNo=0;acc=0;reseed();resetAll();
+ const N=Math.round(TOTAL*FPS), out=[];
+ let prev=null;
+ for(let f=1;f<=N;f++){                 // frameNo is 1-based after stepOnce; match it
+  stepOnce();sim(DT);draw();
+  const d=g.getImageData(0,0,W,H).data;
+  let ink=0,sx=0,sy=0,lum=0,n=0,minx=W,maxx=0,miny=H,maxy=0,diff=0,inkDiff=0,inkN=0;
+  const cur=new Uint8Array(Math.ceil(W/step)*Math.ceil(H/step));
+  let idx=0;
+  for(let y=0;y<H;y+=step)for(let x=0;x<W;x+=step){
+   const i=(y*W+x)*4, L=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114);
+   cur[idx]=L|0;
+   if(prev){const dd=Math.abs(L-prev[idx]);diff+=dd;
+    /* the whole-frame diff is dominated by 1150 flakes, so character stepping is
+       invisible in it. Restrict to pixels that are INK in either frame. */
+    if(L<120||prev[idx]<120){inkDiff+=dd;inkN++;}}
+   idx++;n++;lum+=L;
+   if(L<90){ink++;sx+=x;sy+=y;
+    if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}
+  }
+  out.push({f,t:+T.toFixed(3),shot:SHOTS[shotNow()].k,
+   diff:prev?+(diff/n).toFixed(3):0,
+   inkDiff:(prev&&inkN)?+(inkDiff/inkN).toFixed(3):0,
+   ink:+(ink/n).toFixed(5),
+   cx:ink?Math.round(sx/ink):-1, cy:ink?Math.round(sy/ink):-1,
+   w:ink?maxx-minx:0, h:ink?maxy-miny:0,
+   lum:+(lum/n).toFixed(1),
+   phD:+hero.phD.toFixed(5), ph:+hero.ph.toFixed(5),
+   dist:+hero.dist.toFixed(3), cl0:+(hero.clothD?hero.clothD[3].x:0).toFixed(3),
+   scale:+curScale.toFixed(2)});
+  prev=cur;
+ }
+ return out;
+};
+window.__frameTo=(n)=>{                     // deterministic: same n, same picture, always
+ playing=false;T=0;frameNo=0;acc=0;reseed();resetAll();
+ for(let i=0;i<n;i++){stepOnce();sim(DT);}
+ draw();
+ return {frame:n,t:+T.toFixed(4),shot:SHOTS[shotNow()].k};
+};
+/* A window onto the mechanism itself, not its pixel shadow. Every bug in this file
+   that cost real time was a mechanism running correctly on a wrong input, which a
+   picture cannot show you and a state probe can. */
+window.__probe=()=>{
+ const P=(a)=>{const K=poseFor(a,a.phD,a.idleD);
+  return {mode:a.mode,idx:a.mode==='walk'?walkIndex(a.phD):-1,
+   hip:+K.hip.toFixed(2), shx:+K.sh[0].toFixed(2), shy:+K.sh[1].toFixed(2),
+   nax:+K.na[0].toFixed(2), fax:+K.fa[0].toFixed(2), nhx:+K.nh[0].toFixed(2),
+   cl3x:+(a.clothD?a.clothD[3].x:a.cloth[3].x).toFixed(3),
+   prints:a.prints.length, spray:a.spray.length, dist:+a.distD.toFixed(2)};};
+ return {f:frameNo,t:+T.toFixed(3),shot:SHOTS[shotNow()].k,scale:+curScale.toFixed(2),
+  hero:P(hero),other:P(other)};
+};
+window.__sheet={WALK,CHARGE,STAND_A,STAND_B,CLASH,AFTER,PW,WALK_HOLDS,WALK_TRAVEL};
+window.__step=()=>{stepOnce();sim(DT);draw();return window.__probe();};
+window.__rewind=()=>{playing=false;T=0;frameNo=0;acc=0;reseed();resetAll();};
+window.__fps=FPS;window.__total=TOTAL;
+const start=()=>{last=performance.now();requestAnimationFrame(frame);};
+if(document.fonts&&document.fonts.load){
+ Promise.all([document.fonts.load('300 80px "Cormorant Garamond"'),
+              document.fonts.load('500 38px "IBM Plex Mono"')]).then(start).catch(start);
+}else start();
+if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+ playing=false;T=S[3]+0.9;
+}
+})();
+</script>

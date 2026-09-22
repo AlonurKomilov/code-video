@@ -1,0 +1,507 @@
+<title>Not A Measurement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --paper:#f7e6e1;      /* chart paper */
+  --grid-fine:#eab9ae;
+  --grid-bold:#d98878;
+  --ink:#16100e;        /* pen ink, warm black */
+  --pen:#bf2418;        /* the red pen */
+  --shell:#141010;      /* around the frame */
+  --shell-2:#1f1815;
+  --shell-line:#3a2c27;
+  --shell-text:#e8ddd8;
+  --shell-dim:#9c8a83;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--shell);color:var(--shell-text);
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding-block:20px;padding-left:16px;padding-right:16px;gap:14px;
+}
+.wrap{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:12px}
+.stage{
+  position:relative;width:100%;aspect-ratio:16/9;max-width:100%;
+  background:var(--paper);overflow:hidden;
+  border:1px solid var(--shell-line);
+}
+canvas{display:block;width:100%;height:100%}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+button{
+  font:600 12px/1 "IBM Plex Mono",monospace;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--shell-text);background:var(--shell-2);border:1px solid var(--shell-line);
+  padding:9px 14px;cursor:pointer;transition:border-color .15s,color .15s;
+}
+button:hover{border-color:var(--pen);color:#fff}
+button:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--pen);color:#fff}
+.seg{display:flex;border:1px solid var(--shell-line)}
+.seg button{border:0;border-right:1px solid var(--shell-line)}
+.seg button:last-child{border-right:0}
+.spacer{flex:1 1 auto;min-width:0}
+.meta{
+  font-size:11px;line-height:1.5;color:var(--shell-dim);letter-spacing:.04em;
+  display:flex;gap:16px;flex-wrap:wrap;
+}
+.meta b{color:var(--shell-text);font-weight:600}
+.track{
+  height:3px;width:100%;background:var(--shell-2);position:relative;overflow:hidden;
+}
+.track i{position:absolute;inset:0 auto 0 0;width:0;background:var(--pen);display:block}
+@media (prefers-reduced-motion:reduce){.track i{transition:none}}
+</style>
+
+<div class="wrap">
+  <div class="stage"><canvas id="cv" width="1920" height="1080" aria-label="Kinetic typography piece: a manifesto about measurement"></canvas></div>
+  <div class="track"><i id="prog"></i></div>
+  <div class="bar">
+    <button id="play" type="button">Qayta ijro</button>
+    <button id="snd" type="button" aria-pressed="false">Ovoz: o'chiq</button>
+    <div class="seg" role="group" aria-label="Til">
+      <button id="uz" type="button" aria-pressed="true">UZ</button>
+      <button id="en" type="button" aria-pressed="false">EN</button>
+    </div>
+    <span class="spacer"></span>
+  </div>
+  <div class="meta">
+    <span><b>16.8 s</b> · 8 kadr · 100 BPM</span>
+    <span>Matn: <b>media-audit-reality</b> tamoyili</span>
+    <span>Kod bilan chizilgan · ovoz sintez qilingan</span>
+  </div>
+</div>
+
+<script>
+(function(){
+const cv=document.getElementById('cv'),g=cv.getContext('2d');
+const W=1920,H=1080;
+const PAPER='#f7e6e1',FINE='#eab9ae',BOLD='#d98878',INK='#16100e',PEN='#bf2418';
+
+/* ============ SCORE ============
+   Every cut carries its own text, duration, treatment and sound.
+   100 BPM -> beat 0.6 s. Cuts land on beats; the held silence does not. */
+const BEAT=0.6;
+const CUTS=[
+ {d:3.00,kind:'open',   uz:["HARAKATNI","KO'RA OLMAYSAN"],        en:["YOU CANNOT","SEE IT MOVE"]},
+ {d:2.40,kind:'stack',  uz:["OVOZNI","ESHITA","OLMAYSAN"],        en:["YOU CANNOT","HEAR","IT"]},
+ {d:0.30,kind:'flash',  uz:["DEMAK"],                              en:["SO"]},
+ {d:0.25,kind:'hold',   uz:[""],                                   en:[""]},
+ {d:2.45,kind:'impact', uz:["O'LCHA."],                            en:["MEASURE."]},
+ {d:2.80,kind:'data',   uz:["KALIBRLANMAGAN","RAQAM"],             en:["A NUMBER YOU","HAVE NOT CALIBRATED"]},
+ {d:1.40,kind:'strike', uz:["O'LCHOV EMAS."],                      en:["IS NOT A MEASUREMENT."]},
+ {d:4.20,kind:'settle', uz:["U SHUNCHAKI","RAQAM."],               en:["IT IS JUST","A NUMBER."]}
+];
+const STARTS=[];{let a=0;for(const c of CUTS){STARTS.push(a);a+=c.d;}}
+const TOTAL=STARTS[STARTS.length-1]+CUTS[CUTS.length-1].d;
+
+/* Real figures from the work this manifesto came out of — the instrument layer.
+   These are measurements, which is the whole point of putting them on the paper. */
+const READOUT=[
+ ['FLATNESS','0.483','0.091'],
+ ['ROUGHNESS','0.213','0.040'],
+ ['SHARPNESS','1.93','1.27'],
+ ['PHONE dB','-19.7','-16.8']
+];
+
+let LANG='uz';
+const txt=c=>c[LANG];
+
+/* ============ TIME ============ */
+let T=0,playing=true,last=performance.now();
+let shake=0;
+
+/* ============ PAPER ============ */
+function grid(alpha){
+ g.fillStyle=PAPER;g.fillRect(0,0,W,H);
+ if(alpha<=0)return;
+ g.save();g.globalAlpha=alpha;
+ g.save();g.globalAlpha=alpha*.34;
+ g.strokeStyle=FINE;g.lineWidth=1;g.beginPath();
+ for(let x=0;x<=W;x+=30){g.moveTo(x+.5,0);g.lineTo(x+.5,H);}
+ for(let y=0;y<=H;y+=30){g.moveTo(0,y+.5);g.lineTo(W,y+.5);}
+ g.stroke();g.restore();
+ g.save();g.globalAlpha=alpha*.62;
+ g.strokeStyle=BOLD;g.lineWidth=1.8;g.beginPath();
+ for(let x=0;x<=W;x+=150){g.moveTo(x+.5,0);g.lineTo(x+.5,H);}
+ for(let y=0;y<=H;y+=150){g.moveTo(0,y+.5);g.lineTo(W,y+.5);}
+ g.stroke();g.restore();
+ g.restore();
+}
+
+/* the pen trace along the bottom: it runs with time and kicks at every cut */
+function trace(){
+ const y0=H-96;
+ g.save();
+ g.strokeStyle=PEN;g.lineWidth=3;g.lineJoin='round';g.lineCap='round';
+ g.beginPath();
+ const x1=96+(W-192)*(T/TOTAL);
+ let started=false;
+ for(let x=96;x<=x1;x+=3){
+  const tt=(x-96)/(W-192)*TOTAL;
+  let y=y0;
+  for(let i=0;i<CUTS.length;i++){
+   const dt=tt-STARTS[i];
+   if(dt>=0&&dt<0.34){                                  // the pen jumps when the frame changes
+    const amp=CUTS[i].kind==='impact'?62:CUTS[i].kind==='flash'?40:22;
+    y-=Math.sin(dt/0.34*Math.PI)*amp*Math.exp(-dt*5);
+   }
+  }
+  y-=Math.sin(tt*11.3)*1.6+Math.sin(tt*27.7)*0.9;       // the instrument is never perfectly still
+  if(!started){g.moveTo(x,y);started=true;}else g.lineTo(x,y);
+ }
+ g.stroke();
+ g.fillStyle=PEN;g.beginPath();g.arc(x1,y0,5,0,Math.PI*2);g.fill();
+ g.restore();
+}
+
+/* ============ TYPE ============ */
+const DISPLAY=w=>`400 ${w}px "Archivo Black", "Arial Black", Impact, "Haettenschweiler", system-ui, sans-serif`;
+const MONO=(w,b)=>`${b||400} ${w}px "IBM Plex Mono", ui-monospace, monospace`;
+
+function fitLine(str,maxW,maxPx){
+ let s=maxPx;
+ g.font=DISPLAY(s);
+ while(g.measureText(str).width>maxW&&s>14){s-=4;g.font=DISPLAY(s);}
+ return s;
+}
+function line(str,cx,y,px,color,track){
+ g.font=DISPLAY(px);g.fillStyle=color;g.textAlign='center';g.textBaseline='alphabetic';
+ if(!track){g.fillText(str,cx,y);return;}
+ const chars=[...str];
+ let tot=0;for(const c of chars)tot+=g.measureText(c).width+track;
+ tot-=track;
+ let x=cx-tot/2;
+ for(const c of chars){const w=g.measureText(c).width;g.fillText(c,x+w/2,y);x+=w+track;}
+}
+const ease=x=>1-Math.pow(1-x,3);
+const overshoot=(x)=>{const p=Math.min(1,x/0.13);return 1.07-0.07*ease(p);};
+
+/* small measurement marks that make the paper an instrument, not a background */
+function ticks(cx,y,w,a){
+ if(a<=0)return;
+ g.save();g.globalAlpha=a;g.strokeStyle=PEN;g.lineWidth=2;
+ g.beginPath();
+ g.moveTo(cx-w/2,y);g.lineTo(cx-w/2,y+16);
+ g.moveTo(cx+w/2,y);g.lineTo(cx+w/2,y+16);
+ g.moveTo(cx-w/2,y+8);g.lineTo(cx+w/2,y+8);
+ g.stroke();
+ g.font=MONO(20,600);g.fillStyle=PEN;g.textAlign='center';
+ g.fillText(Math.round(w)+' px',cx,y+42);
+ g.restore();
+}
+function corner(txt1,txt2){
+ g.font=MONO(20,600);g.fillStyle=INK;g.globalAlpha=.45;
+ g.textAlign='left';g.fillText(txt1,96,84);
+ g.textAlign='right';g.fillText(txt2,W-96,84);
+ g.globalAlpha=1;
+}
+
+/* ============ FRAMES ============ */
+function draw(){
+ const i=(()=>{let k=0;for(let j=0;j<CUTS.length;j++)if(T>=STARTS[j])k=j;return k;})();
+ const c=CUTS[i],u=Math.min(1,(T-STARTS[i])/c.d),lt=T-STARTS[i];
+ const lines=txt(c);
+
+ g.setTransform(1,0,0,1,0,0);
+ if(shake>0){
+  const s=shake*10;
+  g.setTransform(1,0,0,1,(Math.random()-.5)*s,(Math.random()-.5)*s);
+  shake=Math.max(0,shake-0.055);
+ }
+
+ if(c.kind==='flash'||c.kind==='impact'&&lt<0.12){
+  g.fillStyle=INK;g.fillRect(-40,-40,W+80,H+80);
+ }else{
+  grid(c.kind==='hold'?0.35:c.kind==='open'?Math.min(1,lt/0.9)*0.9:0.9);
+ }
+
+ if(c.kind==='open'){
+  corner('CHART REC. 01','t = '+T.toFixed(2)+' s');
+  const px=fitLine(lines[1],W-260,215);
+  const a=ease(Math.min(1,lt/0.5));
+  g.save();g.globalAlpha=a;
+  line(lines[0],W/2,H/2-56,px,INK,2);
+  line(lines[1],W/2,H/2+px*0.92-46,px,INK,2);
+  g.restore();
+  if(lt>1.5)ticks(W/2,H/2+px+58,g.measureText(lines[1]).width*0+560,Math.min(1,(lt-1.5)/.6)*.8);
+ }
+
+ else if(c.kind==='stack'){
+  corner('CHART REC. 02','t = '+T.toFixed(2)+' s');
+  const px=fitLine(lines[0],W-260,205);
+  for(let k=0;k<lines.length;k++){
+   const st=k*0.3;if(lt<st)break;
+   const a=ease(Math.min(1,(lt-st)/0.16)),sc=overshoot(lt-st);
+   g.save();
+   g.translate(W/2,H/2-70+k*(px*1.12));
+   g.scale(sc,sc);g.globalAlpha=a;
+   line(lines[k],0,0,px,k===lines.length-1?PEN:INK,1);
+   g.restore();
+  }
+ }
+
+ else if(c.kind==='flash'){
+  const px=fitLine(lines[0],W-420,200);
+  line(lines[0]+'—',W/2,H/2+px*0.35,px,PAPER,4);
+ }
+
+ else if(c.kind==='hold'){
+  /* 0.25 s of nothing. The silence before the hit is what makes the hit. */
+  corner('','');
+ }
+
+ else if(c.kind==='impact'){
+  const inv=lt<0.12;
+  const px=fitLine(lines[0],W-150,560);
+  const sc=overshoot(lt);
+  g.save();
+  g.translate(W/2,H/2+px*0.34);g.scale(sc,sc);
+  line(lines[0],0,0,px,inv?PAPER:INK,0);
+  g.restore();
+  if(!inv){
+   g.save();g.globalAlpha=Math.min(1,(lt-0.12)/0.3);
+   g.strokeStyle=PEN;g.lineWidth=5;
+   g.beginPath();g.moveTo(96,H/2+px*0.34+34);g.lineTo(W-96,H/2+px*0.34+34);g.stroke();
+   g.restore();
+   corner('CHART REC. 03','PEAK');
+  }
+ }
+
+ else if(c.kind==='data'){
+  corner('CHART REC. 04','t = '+T.toFixed(2)+' s');
+  const px=fitLine(lines[0].length>lines[1].length?lines[0]:lines[1],W-300,150);
+  for(let k=0;k<lines.length;k++){
+   const st=k*0.26;if(lt<st)continue;
+   const a=ease(Math.min(1,(lt-st)/0.18));
+   g.save();g.globalAlpha=a;
+   line(lines[k],W/2,H/2-176+k*(px*1.06),px,INK,1);
+   g.restore();
+  }
+  /* the readout: real before/after figures, arriving one row at a time */
+  const rowT=0.9;
+  g.textAlign='left';
+  for(let r=0;r<READOUT.length;r++){
+   const st=rowT+r*0.16;if(lt<st)continue;
+   const a=ease(Math.min(1,(lt-st)/0.14));
+   g.save();g.globalAlpha=a*.92;
+   const y=H/2+110+r*44,x=W/2-330;
+   g.font=MONO(26,600);g.fillStyle=INK;g.fillText(READOUT[r][0],x,y);
+   g.font=MONO(26,400);g.fillStyle=INK;g.globalAlpha=a*.45;
+   g.fillText(READOUT[r][1],x+330,y);
+   g.globalAlpha=a;g.fillStyle=PEN;g.font=MONO(26,600);
+   g.fillText('→  '+READOUT[r][2],x+450,y);
+   g.restore();
+  }
+ }
+
+ else if(c.kind==='strike'){
+  corner('CHART REC. 05','t = '+T.toFixed(2)+' s');
+  const px=fitLine(lines[0],W-220,215);
+  line(lines[0],W/2,H/2+px*0.34,px,INK,1);
+  g.font=DISPLAY(px);
+  const w=g.measureText(lines[0]).width+lines[0].length*3;
+  const p=ease(Math.min(1,lt/0.42));
+  g.save();
+  g.strokeStyle=PEN;g.lineWidth=9;g.lineCap='round';
+  g.beginPath();
+  g.moveTo(W/2-w/2-14,H/2+px*0.02);
+  g.lineTo(W/2-w/2-14+(w+28)*p,H/2+px*0.02-10);
+  g.stroke();g.restore();
+ }
+
+ else if(c.kind==='settle'){
+  corner('CHART REC. 06','END');
+  const px=fitLine(lines[1],W-280,200);
+  const a=ease(Math.min(1,lt/0.4));
+  g.save();g.globalAlpha=a;
+  line(lines[0],W/2,H/2-46,px,INK,2);
+  line(lines[1],W/2,H/2+px*0.92-36,px,PEN,2);
+  g.restore();
+  if(lt>1.6){
+   const b=ease(Math.min(1,(lt-1.6)/0.7));
+   g.save();g.globalAlpha=b*.7;
+   g.font=MONO(24,400);g.fillStyle=INK;g.textAlign='center';
+   g.fillText(LANG==='uz'
+     ? "Kalibrlanmagan metrika o'lchov emas."
+     : "An uncalibrated metric is not a measurement.",W/2,H/2+px*2.05);
+   g.restore();
+  }
+ }
+
+ trace();
+ g.setTransform(1,0,0,1,0,0);
+}
+
+/* ============ SOUND ============
+   The whole score is scheduled at once against the audio clock, not triggered
+   per frame — a music-locked piece cannot afford requestAnimationFrame jitter. */
+let AC=null,master=null,lim=null,soundOn=false,noiseBuf=null;
+function gn(v){const n=AC.createGain();n.gain.value=v;return n;}
+function bq(t,f,q){const n=AC.createBiquadFilter();n.type=t;n.frequency.value=f;n.Q.value=q;return n;}
+function initAudio(){
+ AC=new (window.AudioContext||window.webkitAudioContext)();
+ lim=AC.createDynamicsCompressor();
+ lim.threshold.value=-3;lim.knee.value=0;lim.ratio.value=14;
+ lim.attack.value=0.002;lim.release.value=0.12;
+ master=gn(0.0);master.connect(lim);lim.connect(AC.destination);
+ const n=Math.floor(AC.sampleRate*2),d=new Float32Array(n);
+ for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+ noiseBuf=AC.createBuffer(1,n,AC.sampleRate);noiseBuf.copyToChannel(d,0);
+}
+function kick(t,lvl){
+ const o=AC.createOscillator(),e=gn(0);
+ o.frequency.setValueAtTime(128,t);
+ o.frequency.exponentialRampToValueAtTime(38,t+0.09);
+ e.gain.setValueAtTime(0,t);
+ e.gain.linearRampToValueAtTime(lvl,t+0.004);
+ e.gain.exponentialRampToValueAtTime(0.0006,t+0.34);
+ o.connect(e).connect(master);o.start(t);o.stop(t+0.4);
+ const s=AC.createBufferSource(),f=bq('bandpass',1700,1.1),ce=gn(0);
+ s.buffer=noiseBuf;
+ ce.gain.setValueAtTime(lvl*0.34,t);
+ ce.gain.exponentialRampToValueAtTime(0.0004,t+0.03);     // the click, without which it is a thud
+ s.connect(f).connect(ce).connect(master);s.start(t,0.3);s.stop(t+0.05);
+}
+function hat(t,lvl,len){
+ const s=AC.createBufferSource(),f=bq('highpass',7400,0.7),e=gn(0);
+ s.buffer=noiseBuf;
+ e.gain.setValueAtTime(0,t);
+ e.gain.linearRampToValueAtTime(lvl,t+0.002);
+ e.gain.exponentialRampToValueAtTime(0.0004,t+(len||0.035));
+ s.connect(f).connect(e).connect(master);s.start(t,Math.random()*1.5);s.stop(t+0.12);
+}
+function clap(t,lvl){
+ for(let k=0;k<3;k++){
+  const tt=t+k*0.011,s=AC.createBufferSource(),f=bq('bandpass',1500,0.9),e=gn(0);
+  s.buffer=noiseBuf;
+  e.gain.setValueAtTime(0,tt);
+  e.gain.linearRampToValueAtTime(lvl*(k===2?1:0.6),tt+0.002);
+  e.gain.exponentialRampToValueAtTime(0.0004,tt+(k===2?0.16:0.03));
+  s.connect(f).connect(e).connect(master);s.start(tt,Math.random()*1.5);s.stop(tt+0.25);
+ }
+}
+function sub(t,dur,f0,f1,lvl){
+ const o=AC.createOscillator(),e=gn(0);
+ o.frequency.setValueAtTime(f0,t);
+ o.frequency.exponentialRampToValueAtTime(f1,t+dur*0.8);
+ e.gain.setValueAtTime(0,t);
+ e.gain.linearRampToValueAtTime(lvl,t+0.01);
+ e.gain.exponentialRampToValueAtTime(0.0005,t+dur);
+ o.connect(e).connect(master);o.start(t);o.stop(t+dur+0.05);
+}
+function riser(t,dur,lvl){
+ const s=AC.createBufferSource(),f=bq('bandpass',400,3.2),e=gn(0);
+ s.buffer=noiseBuf;s.loop=true;
+ f.frequency.setValueAtTime(380,t);
+ f.frequency.exponentialRampToValueAtTime(5200,t+dur);
+ e.gain.setValueAtTime(0.0008,t);
+ e.gain.exponentialRampToValueAtTime(lvl,t+dur*0.92);
+ e.gain.exponentialRampToValueAtTime(0.0004,t+dur+0.05);
+ s.connect(f).connect(e).connect(master);s.start(t);s.stop(t+dur+0.1);
+}
+function scratch(t,dur,lvl){            /* the pen on the paper — the only ambient layer */
+ const s=AC.createBufferSource(),f=bq('bandpass',2600,1.4),e=gn(0);
+ s.buffer=noiseBuf;s.loop=true;s.playbackRate.value=0.55;
+ e.gain.setValueAtTime(0,t);
+ e.gain.linearRampToValueAtTime(lvl,t+0.4);
+ e.gain.setValueAtTime(lvl,t+dur-0.5);
+ e.gain.linearRampToValueAtTime(0,t+dur);
+ s.connect(f).connect(e).connect(master);s.start(t,Math.random());s.stop(t+dur+0.05);
+}
+function schedule(t0){
+ const at=s=>t0+s;
+ scratch(at(0),TOTAL,0.020);
+ for(let b=0;b<9;b++){                                   // cut 1-2: pulse, then the kick joins
+  const t=at(b*BEAT);
+  hat(t,b<5?0.05:0.085);
+  if(b>=5&&b%2===1)kick(t,0.52);
+ }
+ sub(at(0),3.0,44,40,0.10);
+ kick(at(0),0.40);
+ riser(at(3.0),2.4,0.13);                                // into the turn
+ kick(at(5.4),0.85);                                     // the flash lands on a hit
+ /* at(5.7) .. at(5.95): nothing is scheduled. That gap IS the design. */
+ sub(at(5.95),1.5,92,33,0.44);                           // the impact
+ kick(at(5.95),1.0);clap(at(5.95),0.34);
+ const s5=5.95;
+ for(let b=1;b<4;b++){const t=at(s5+b*BEAT);kick(t,0.58);hat(t,0.075);hat(t+BEAT/2,0.045);}
+ for(let b=0;b<5;b++){                                   // cut 6: the full pattern
+  const t=at(8.4+b*BEAT);
+  kick(t,0.6);hat(t,0.08);hat(t+BEAT/2,0.05);
+  if(b%2===1)clap(t,0.26);
+ }
+ sub(at(8.4),2.8,41,38,0.14);
+ for(let b=0;b<2;b++){const t=at(11.2+b*BEAT);kick(t,0.66);hat(t,0.085);clap(t+BEAT/2,0.22);}
+ kick(at(12.6),0.95);clap(at(12.6),0.30);                // cut 8: one last hit, then let it go
+ sub(at(12.6),3.4,58,32,0.34);
+ hat(at(12.6),0.09);hat(at(13.2),0.05);hat(at(13.8),0.035);
+}
+let scheduledAt=-1;
+function armAudio(fromZero){
+ if(!soundOn||!AC)return;
+ if(fromZero){scheduledAt=AC.currentTime+0.08;schedule(scheduledAt);}
+}
+
+/* ============ LOOP ============ */
+const prog=document.getElementById('prog');
+function frame(now){
+ const dt=Math.min(0.05,(now-last)/1000);last=now;
+ if(playing){
+  T+=dt;
+  if(T>=TOTAL){T=TOTAL;playing=false;}
+ }
+ /* the flash and the impact shake the instrument */
+ for(let i=0;i<CUTS.length;i++){
+  const d=T-STARTS[i];
+  if(CUTS[i].kind==='impact'&&d>=0&&d<0.03)shake=1;
+  if(CUTS[i].kind==='flash'&&d>=0&&d<0.03)shake=0.5;
+ }
+ draw();
+ prog.style.width=(T/TOTAL*100).toFixed(2)+'%';
+ requestAnimationFrame(frame);
+}
+
+function restart(){
+ T=0;playing=true;last=performance.now();
+ if(soundOn&&AC){AC.resume();armAudio(true);}
+}
+
+/* ============ CONTROLS ============ */
+const bPlay=document.getElementById('play'),bSnd=document.getElementById('snd');
+const bUz=document.getElementById('uz'),bEn=document.getElementById('en');
+bPlay.addEventListener('click',restart);
+bSnd.addEventListener('click',()=>{
+ if(!AC)initAudio();
+ soundOn=!soundOn;
+ bSnd.textContent=soundOn?"Ovoz: yoniq":"Ovoz: o'chiq";
+ bSnd.setAttribute('aria-pressed',String(soundOn));
+ if(soundOn){AC.resume();master.gain.setTargetAtTime(0.9,AC.currentTime,0.05);restart();}
+ else master.gain.setTargetAtTime(0,AC.currentTime,0.05);
+});
+function setLang(l){
+ LANG=l;
+ bUz.setAttribute('aria-pressed',String(l==='uz'));
+ bEn.setAttribute('aria-pressed',String(l==='en'));
+ restart();
+}
+bUz.addEventListener('click',()=>setLang('uz'));
+bEn.addEventListener('click',()=>setLang('en'));
+
+/* Fonts must be there before the first measureText, or every size is computed
+   against the fallback and the layout jumps once the real face arrives. */
+const start=()=>{last=performance.now();requestAnimationFrame(frame);};
+if(document.fonts&&document.fonts.load){
+ Promise.all([
+  document.fonts.load('400 200px "Archivo Black"'),
+  document.fonts.load('600 26px "IBM Plex Mono"')
+ ]).then(start).catch(start);
+}else start();
+
+if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+ playing=false;T=STARTS[4]+0.6;            // rest on the impact frame instead of animating
+}
+})();
+</script>

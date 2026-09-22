@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yomg'irli derazadagi mushuk</title>
+<style>
+:root{--bg:#1a1530;--fg:#f3e9d2;--muted:#b3a8c9;--btn:#e24f93;--btnfg:#fff;--track:#4a3d6b}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#efe4cc;--fg:#2b2140;--muted:#6d5f80;--track:#cbb9a2}}
+:root[data-theme="light"]{--bg:#efe4cc;--fg:#2b2140;--muted:#6d5f80;--track:#cbb9a2}
+:root[data-theme="dark"]{--bg:#1a1530;--fg:#f3e9d2;--muted:#b3a8c9;--track:#4a3d6b}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:Georgia,"Iowan Old Style",serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:14px}
+.frame{width:min(100%,720px);aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:#241a4a;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+canvas{display:block;width:100%;height:100%;cursor:pointer;touch-action:manipulation}
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 18px;width:min(100%,720px)}
+button{font:inherit;font-size:16px;background:var(--btn);color:var(--btnfg);border:0;border-radius:999px;padding:10px 22px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--fg);outline-offset:3px}
+.mix{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:88px;height:4px;border-radius:99px;background:var(--track);cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--btn);border:0}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--btn);border:0}
+p{margin:0;font-size:15px;color:var(--muted);text-align:center;max-width:60ch;line-height:1.5}
+@media (prefers-reduced-motion:reduce){.frame{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="frame"><canvas id="c" aria-label="Yomg'irli derazadan tashqariga qarab o'tirgan mushuk animatsiyasi"></canvas></div>
+<div class="bar">
+ <button id="snd" aria-pressed="false">Ovozni yoqish</button>
+ <div class="mix">
+  <label>Yomg'ir <input id="mRain" type="range" min="0" max="1.4" step="0.01" value="1" aria-label="Yomg'ir ovozi"></label>
+  <label>Momaqaldiroq <input id="mThun" type="range" min="0" max="1.4" step="0.01" value="1" aria-label="Momaqaldiroq ovozi"></label>
+  <label>Mushuk <input id="mCat" type="range" min="0" max="1.4" step="0.01" value="1" aria-label="Mushuk ovozi"></label>
+ </div>
+</div>
+<p>Oynaga bossangiz chaqmoq chaqadi, mushukka bossangiz xurillaydi. Rasm, video yoki audio fayl yo'q: hammasi kod bilan yaratiladi.</p>
+<script>
+(()=>{
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const scene=document.createElement('canvas'),g=scene.getContext('2d');
+const L=1000;let px=1,texLinen=null,texDots=null,vign=null;
+let seed=11;const R=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+const WX=240,SILL=880;
+const lerp=(a,b,k)=>a+(b-a)*k;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+// ---------- world ----------
+const buildings=[];{let bx=WX-10;while(bx<L){const w=45+R()*70,h=130+R()*250,wins=[];
+ for(let y=SILL-h+18;y<SILL-24;y+=28)for(let x=bx+10;x<bx+w-14;x+=20)if(R()<.4)wins.push({x,y,on:R()<.75});
+ buildings.push({x:bx,w,h,wins,c:R()<.5?'#3b2385':'#452a96'});bx+=w+6+R()*14;}}
+const bokeh=[];for(let i=0;i<70;i++)bokeh.push({x:WX+R()*(L-WX),y:R()*820,r:2+R()*6,p:R()*6});
+const rain=[];for(let i=0;i<150;i++)rain.push({x:WX+R()*(L-WX),y:R()*SILL,len:30+R()*60,sp:700+R()*600});
+let beads=[];
+let flash=0,flash2=-1,nextBolt=6+R()*6,bolt=null;
+let twitchT=-9,nextTwitch=2+R()*3;
+let startle=0,startleAt=-1,lookBoltX=700,lookBoltUntil=-1,headTurn=0,tailPh=0,petUntil=-1,purr=0;
+
+/* =======================================================================
+   AUDIO — everything below is synthesized; no audio files are loaded.
+   Graph:  [rain bed + drops] -> rainDuck -\
+           [thunder]                        >-- master -> compressor -> out
+           [cat: purr / chirp]             -/        \-> reverb -/
+   ======================================================================= */
+let AC=null,soundOn=false;
+let master,busRain,busThunder,busCat,rainDuck,verb,sendRain,sendThun,sendCat;
+let noiseBuf,pinkBuf,dropBufs=[],sillBufs=[];
+let purrGate,purrLevel,purrRate,glassLP;
+let dropClock=0,lastDripSnd=0;
+const vol={rain:1,thunder:1,cat:1};
+
+function pinkData(len){
+ const d=new Float32Array(len);let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+ for(let i=0;i<len;i++){const w=Math.random()*2-1;
+  b0=.99886*b0+w*.0555179;b1=.99332*b1+w*.0750759;b2=.96900*b2+w*.1538520;
+  b3=.86650*b3+w*.3104856;b4=.55000*b4+w*.5329522;b5=-.7616*b5-w*.0168980;
+  d[i]=(b0+b1+b2+b3+b4+b5+b6+w*.5362)*.11;b6=w*.115926;}
+ return d;
+}
+function bufFrom(data){const b=AC.createBuffer(1,data.length,AC.sampleRate);b.copyToChannel(data,0);return b;}
+function loopSrc(buf,rate){const s=AC.createBufferSource();s.buffer=buf;s.loop=true;if(rate)s.playbackRate.value=rate;s.start();return s;}
+function band(type,f,q){const n=AC.createBiquadFilter();n.type=type;n.frequency.value=f;if(q!=null)n.Q.value=q;return n;}
+function gain(v){const n=AC.createGain();n.gain.value=v;return n;}
+
+// one short percussive water tap: noise burst + a little pitched body
+function makeTap(sr,freq,dur,bright){
+ const len=Math.floor(sr*dur),d=new Float32Array(len);
+ let lp=0;const a=bright;
+ for(let i=0;i<len;i++){
+  const t=i/sr,env=Math.exp(-t*(1/dur)*7);
+  lp+=a*((Math.random()*2-1)-lp);                       // colored noise
+  d[i]=(lp*.85+Math.sin(2*Math.PI*freq*t)*.35*Math.exp(-t*90))*env;
+ }
+ // tiny fade-in so it never clicks
+ for(let i=0;i<64&&i<len;i++)d[i]*=i/64;
+ return d;
+}
+// reverb impulse: dark, small-room tail
+function makeIR(sr,sec,decay,tone){
+ const len=Math.floor(sr*sec),ir=AC.createBuffer(2,len,sr);
+ for(let c=0;c<2;c++){const d=ir.getChannelData(c);let lp=0;
+  for(let i=0;i<len;i++){const t=i/len;
+   lp+=tone*((Math.random()*2-1)-lp);
+   d[i]=lp*Math.pow(1-t,decay);}}
+ return ir;
+}
+
+function initAudio(){
+ AC=new (window.AudioContext||window.webkitAudioContext)();
+ const sr=AC.sampleRate;
+
+ master=gain(0);
+ const comp=AC.createDynamicsCompressor();
+ comp.threshold.value=-3;comp.knee.value=6;comp.ratio.value=14;comp.attack.value=.002;comp.release.value=.22;
+ master.connect(comp).connect(AC.destination);
+
+ verb=AC.createConvolver();verb.buffer=makeIR(sr,2.2,2.6,.22);
+ const verbOut=gain(.85);verb.connect(verbOut).connect(master);
+
+ busRain=gain(1);busThunder=gain(1);busCat=gain(1);
+ rainDuck=gain(1);
+ busRain.connect(rainDuck).connect(master);
+ busThunder.connect(master);busCat.connect(master);
+ sendRain=gain(.10);busRain.connect(sendRain).connect(verb);
+ sendThun=gain(.75);busThunder.connect(sendThun).connect(verb);
+ sendCat=gain(.10);busCat.connect(sendCat).connect(verb);
+
+ noiseBuf=bufFrom((()=>{const d=new Float32Array(sr*4);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return d;})());
+ pinkBuf=bufFrom(pinkData(sr*4));
+ for(let i=0;i<6;i++)dropBufs.push(bufFrom(makeTap(sr,rnd(1300,3200),rnd(.016,.040),rnd(.62,.95))));
+ for(let i=0;i<4;i++)sillBufs.push(bufFrom(makeTap(sr,rnd(200,420),rnd(.07,.14),.16)));
+
+ // --- rain bed: heard through glass, so the top end is softened, not removed ---
+ glassLP=band('lowpass',3000,.5);                 // the window itself
+ const glassShelf=band('highshelf',2000);glassShelf.gain.value=-7;
+ glassLP.connect(glassShelf).connect(busRain);
+ const pan=v=>{if(!AC.createStereoPanner)return gain(1);const n=AC.createStereoPanner();n.pan.value=v;return n;};
+ // the sheet of rain falling outside — the main voice of it
+ const sheet=loopSrc(pinkBuf,1.6),sf=band('bandpass',1500,.5),sg=gain(.58);
+ sheet.connect(sf).connect(sg).connect(pan(-.35)).connect(glassLP);
+ // patter against the pane, a touch brighter and offset to the other side
+ const pat=loopSrc(pinkBuf,2.4),pf=band('bandpass',2600,.6),pg=gain(.34);
+ pat.connect(pf).connect(pg).connect(pan(.35)).connect(glassLP);
+ // just enough low end to feel weather, not a passing truck
+ const body=loopSrc(pinkBuf,.55),bf=band('lowpass',260,.6),bg=gain(.21);
+ body.connect(bf).connect(bg).connect(glassLP);
+ // fine hiss, kept quiet so it never sounds like static
+ const hiss=loopSrc(noiseBuf,1),hf=band('bandpass',5000,.5),hg=gain(.075);
+ hiss.connect(hf).connect(hg).connect(busRain);
+ // slow swell so the bed breathes instead of sitting flat
+ const swell=AC.createOscillator();swell.frequency.value=.055;
+ const sw=gain(.10);swell.connect(sw);sw.connect(sg.gain);sw.connect(pg.gain);swell.start();
+ // wind behind it all
+ const wind=loopSrc(pinkBuf,.35),wf=band('lowpass',300,.5),wg=gain(0);
+ wind.connect(wf).connect(wg).connect(glassLP);
+ const wLfo=AC.createOscillator();wLfo.frequency.value=.037;
+ const wD=gain(.06),wB=AC.createConstantSource();wB.offset.value=.07;
+ wLfo.connect(wD).connect(wg.gain);wB.connect(wg.gain);wLfo.start();wB.start();
+
+ // --- purr: ~26 Hz pulse train, two strokes per breath, chest resonance ---
+ const purrSrc=loopSrc(pinkBuf,.8);
+ const chest=band('lowpass',900,1.4);             // body of the cat
+ const form=band('bandpass',320,1.4);             // chest resonance
+ const rasp=band('bandpass',1050,2.2);            // the grain you hear up close
+ const purrMix=gain(1);form.connect(purrMix);rasp.connect(gain(.75)).connect(purrMix);
+ const grain=gain(0);                             // the 26 Hz roll
+ purrRate=AC.createOscillator();purrRate.type='sine';purrRate.frequency.value=26;
+ const shaper=AC.createWaveShaper();{
+  const c=new Float32Array(257);
+  for(let i=0;i<257;i++){const x=i/128-1;c[i]=Math.pow(Math.max(0,x),.6);} // rounded pulses, not a hum
+  shaper.curve=c;}
+ const grainDepth=gain(1.0),grainBias=AC.createConstantSource();grainBias.offset.value=.06;
+ purrRate.connect(shaper).connect(grainDepth).connect(grain.gain);grainBias.connect(grain.gain);
+ purrRate.start();grainBias.start();
+ // rate wobble — a real purr is never metronomic
+ const rw=AC.createOscillator();rw.frequency.value=.23;const rwD=gain(2.2);
+ rw.connect(rwD).connect(purrRate.frequency);rw.start();
+ // breath: full-wave rectified slow sine = inhale + exhale stroke
+ const breath=AC.createOscillator();breath.frequency.value=1.05;
+ const bShape=AC.createWaveShaper();{
+  const c=new Float32Array(257);
+  for(let i=0;i<257;i++){const x=i/128-1;c[i]=Math.abs(x);}
+  bShape.curve=c;}
+ const bDepth=gain(.45),bBias=AC.createConstantSource();bBias.offset.value=.62;
+ purrLevel=gain(0);                               // breath envelope lives here
+ breath.connect(bShape).connect(bDepth);bDepth.connect(purrLevel.gain);bBias.connect(purrLevel.gain);
+ breath.start();bBias.start();
+ purrGate=gain(0);                                // 0..1, how much the cat is purring
+ purrSrc.connect(chest);chest.connect(form);chest.connect(rasp);
+ const purrHP=band('highpass',95,.7);purrMix.connect(purrHP).connect(grain).connect(purrLevel).connect(purrGate);
+ purrGate.connect(gain(3.6)).connect(busCat);
+}
+
+// individual raindrops striking the glass — this is what makes it read as rain
+function audioTick(dt){
+ if(!soundOn||!AC)return;
+ dropClock-=dt;
+ while(dropClock<=0){
+  dropClock+=rnd(.030,.095);
+  const t0=AC.currentTime+rnd(0,.02);
+  const sill=Math.random()<.12;
+  const s=AC.createBufferSource();
+  s.buffer=sill?sillBufs[(Math.random()*sillBufs.length)|0]:dropBufs[(Math.random()*dropBufs.length)|0];
+  s.playbackRate.value=rnd(.8,1.35);
+  const p=AC.createStereoPanner?AC.createStereoPanner():null;
+  const gg=gain(sill?rnd(.20,.36):rnd(.08,.23));
+  if(p){p.pan.value=rnd(-.8,.8);s.connect(gg).connect(p).connect(busRain);}
+  else s.connect(gg).connect(busRain);
+  s.start(t0);s.stop(t0+.3);
+ }
+}
+
+function thunder(delay,near){
+ if(!soundOn)return;const t0=AC.currentTime+delay;
+ const dur=near?4.2:5.4;
+ // sub boom
+ const sub=AC.createOscillator();sub.type='sine';
+ sub.frequency.setValueAtTime(near?64:44,t0);
+ sub.frequency.exponentialRampToValueAtTime(near?30:24,t0+2.6);
+ const sg=gain(0);
+ sg.gain.setValueAtTime(0,t0);sg.gain.linearRampToValueAtTime(near?.80:.45,t0+(near?.05:.35));
+ sg.gain.exponentialRampToValueAtTime(.0008,t0+dur);
+ sub.connect(sg).connect(busThunder);sub.start(t0);sub.stop(t0+dur+.2);
+ // rolling body: filter opens then closes, with two or three rolls
+ const rum=loopSrc(noiseBuf,near?.85:.6);
+ const rf=band('lowpass',70,.9);
+ rf.frequency.setValueAtTime(near?110:70,t0);
+ rf.frequency.linearRampToValueAtTime(near?620:300,t0+.45);
+ rf.frequency.exponentialRampToValueAtTime(60,t0+dur);
+ const rg=gain(0);
+ rg.gain.setValueAtTime(0,t0);
+ rg.gain.linearRampToValueAtTime(near?.85:.48,t0+(near?.06:.4));
+ let lvl=near?.85:.48,tt=t0+(near?.5:.9);
+ while(tt<t0+dur-.4){                              // the roll: it sags and swells as it fades
+  lvl*=rnd(.55,.8);
+  rg.gain.exponentialRampToValueAtTime(Math.max(.004,lvl*.45),tt+.35);
+  rg.gain.exponentialRampToValueAtTime(Math.max(.004,lvl),tt+rnd(.6,1.0));
+  tt+=rnd(.9,1.5);
+ }
+ rg.gain.exponentialRampToValueAtTime(.0008,t0+dur);
+ rum.connect(rf).connect(rg).connect(busThunder);rum.stop(t0+dur+.2);
+ // near strikes get the sharp crack on top
+ if(near){
+  const c=AC.createBufferSource();c.buffer=noiseBuf;
+  const hp=band('highpass',1100,.7),cg=gain(0);
+  cg.gain.setValueAtTime(0,t0);cg.gain.linearRampToValueAtTime(.34,t0+.012);
+  cg.gain.exponentialRampToValueAtTime(.001,t0+.45);
+  c.connect(hp).connect(cg).connect(busThunder);c.start(t0,Math.random()*2);c.stop(t0+.5);
+ }
+ // rain steps aside for the boom, then comes back
+ rainDuck.gain.cancelScheduledValues(t0);
+ rainDuck.gain.setValueAtTime(rainDuck.gain.value,t0);
+ rainDuck.gain.linearRampToValueAtTime(near?.55:.78,t0+.15);
+ rainDuck.gain.linearRampToValueAtTime(1,t0+(near?3:2.2));
+}
+
+function dripSound(){                              // a bead breaking loose on the glass
+ if(!soundOn||AC.currentTime-lastDripSnd<.2)return;lastDripSnd=AC.currentTime;
+ const t0=AC.currentTime,s=AC.createBufferSource();
+ s.buffer=sillBufs[(Math.random()*sillBufs.length)|0];
+ s.playbackRate.value=rnd(1.1,1.8);
+ const gg=gain(rnd(.16,.28));
+ s.connect(gg).connect(busRain);s.start(t0);s.stop(t0+.4);
+}
+
+function chirp(){                                  // soft "mrrp" when you first touch the cat
+ if(!soundOn)return;const t0=AC.currentTime;
+ const o=AC.createOscillator();o.type='sawtooth';
+ o.frequency.setValueAtTime(240,t0);
+ o.frequency.linearRampToValueAtTime(520,t0+.12);
+ o.frequency.linearRampToValueAtTime(380,t0+.34);
+ const vib=AC.createOscillator();vib.frequency.value=22;
+ const vd=gain(14);vib.connect(vd).connect(o.frequency);vib.start(t0);vib.stop(t0+.4);
+ const f1=band('bandpass',760,4),f2=band('bandpass',1500,6),lp=band('lowpass',2600,.7);
+ const m=gain(1);f1.connect(m);f2.connect(gain(.5)).connect(m);
+ const gg=gain(0);
+ gg.gain.setValueAtTime(0,t0);gg.gain.linearRampToValueAtTime(.22,t0+.06);
+ gg.gain.setValueAtTime(.2,t0+.2);gg.gain.exponentialRampToValueAtTime(.001,t0+.45);
+ o.connect(f1);o.connect(f2);m.connect(lp).connect(gg).connect(busCat);
+ o.start(t0);o.stop(t0+.48);
+}
+
+function setPurr(on){
+ if(!soundOn||!purrGate)return;
+ const t=AC.currentTime;
+ purrGate.gain.cancelScheduledValues(t);
+ purrGate.gain.setValueAtTime(purrGate.gain.value,t);
+ purrGate.gain.linearRampToValueAtTime(on?1:0,t+(on?.5:.7));
+}
+
+const btn=document.getElementById('snd');
+function setSound(on){
+ if(on&&!AC)initAudio();
+ soundOn=on;
+ if(AC){if(on)AC.resume();master.gain.setTargetAtTime(on?.7:0,AC.currentTime,.18);}
+ btn.textContent=on?"Ovozni o'chirish":"Ovozni yoqish";btn.setAttribute('aria-pressed',on);
+}
+btn.addEventListener('click',()=>setSound(!soundOn));
+const bind=(id,key,bus)=>document.getElementById(id).addEventListener('input',e=>{
+ vol[key]=+e.target.value;if(AC)bus().gain.setTargetAtTime(vol[key],AC.currentTime,.05);});
+bind('mRain','rain',()=>busRain);bind('mThun','thunder',()=>busThunder);bind('mCat','cat',()=>busCat);
+document.addEventListener('visibilitychange',()=>{if(!AC)return;document.hidden?AC.suspend():soundOn&&AC.resume();});
+
+// ---------- canvas sizing & paper textures ----------
+function resize(){
+ const dpr=Math.min(window.devicePixelRatio||1,2);
+ const n=Math.max(300,Math.round(cv.clientWidth*dpr));
+ cv.width=cv.height=scene.width=scene.height=n;px=n/L;
+ texLinen=document.createElement('canvas');texLinen.width=texLinen.height=n;
+ const t=texLinen.getContext('2d');t.fillStyle='#fff';t.fillRect(0,0,n,n);
+ const step=Math.max(2,3*dpr);
+ for(let i=0;i<n;i+=step){t.fillStyle=`rgba(40,20,60,${.18+Math.random()*.22})`;
+  t.fillRect(0,i,n,Math.max(1,dpr*.8));t.fillRect(i,0,Math.max(1,dpr*.8),n);}
+ texDots=document.createElement('canvas');texDots.width=texDots.height=n;
+ const d=texDots.getContext('2d');const sp=6*dpr;
+ for(let y=0,row=0;y<n+sp;y+=sp*.866,row++){
+  d.beginPath();
+  for(let x=(row%2?sp/2:0);x<n+sp;x+=sp){d.moveTo(x+1.4*dpr,y);d.arc(x,y,1.4*dpr,0,6.283);}
+  d.fillStyle=row%3?'rgba(255,255,255,.55)':'rgba(255,240,120,.45)';d.fill();}
+ vign=ctx.createRadialGradient(n/2,n/2,n*.3,n/2,n/2,n*.75);
+ vign.addColorStop(0,'rgba(0,0,0,0)');vign.addColorStop(1,'rgba(20,5,40,.45)');
+}
+
+// ---------- update ----------
+function update(dt,t){
+ for(const r of rain){r.y+=r.sp*dt;if(r.y-r.len>SILL){r.y=-R()*200;r.x=WX+R()*(L-WX);}}
+ if(beads.length<110&&R()<dt*45)beads.push({x:WX+15+R()*(L-WX-20),y:R()*840,r:1.2+R()*3.4,vy:0,w:R()*6});
+ for(const b of beads){if(!b.slide&&R()<dt*.25)b.r+=.9;if(b.r>6.2&&!b.slide){b.slide=true;dripSound();}}
+ for(const b of beads){if(!b.slide||b.dead)continue;
+  b.vy=Math.min(260,b.vy+320*dt);b.y+=b.vy*dt;b.x+=Math.sin(b.y*.04+b.w)*.35;
+  if(R()<dt*10&&b.r>5){beads.push({x:b.x,y:b.y-b.r*1.2,r:.8+R()*1.2,vy:0,w:0});b.r-=.06;}
+  for(const o of beads){if(o===b||o.dead||o.slide)continue;
+   const dx=o.x-b.x,dy=o.y-b.y;if(dx*dx+dy*dy<(b.r+o.r)**2){b.r=Math.min(13,Math.hypot(b.r,o.r));o.dead=true;}}
+  if(b.y>SILL+20)b.dead=true;}
+ beads=beads.filter(b=>!b.dead);
+ for(const bd of buildings)for(const w of bd.wins)if(R()<dt*.03)w.on=!w.on;
+ if(t>nextBolt)strike(t);
+ if(flash2>0&&t>flash2){flash=.8;flash2=-1;}
+ flash*=Math.exp(-dt*5);
+ if(bolt)bolt.life-=dt;
+ if(t>nextTwitch){twitchT=t;nextTwitch=t+2.5+R()*5;}
+
+ if(startleAt>0&&t>startleAt){startle=1;startleAt=-1;}
+ startle=Math.max(0,startle-dt*.42);
+ let target;
+ if(t<lookBoltUntil)target=lookBoltX;
+ else{let best=null;for(const b of beads)if(b.slide&&b.y<760&&(!best||b.r>best.r))best=b;
+  target=best?best.x:700+Math.sin(t*.3)*110;}
+ const turnGoal=Math.max(-1,Math.min(1,(target-700)/380));
+ headTurn+=(turnGoal-headTurn)*Math.min(1,dt*(startle>.5?7:2.2));
+ const petting=t<petUntil?1:0;
+ const wasPurring=purr>.5;
+ purr+=(petting-purr)*Math.min(1,dt*3);
+ if(wasPurring!==purr>.5)setPurr(purr>.5);
+ tailPh+=dt*(1.15+3.2*startle-.6*purr);
+}
+function strike(t){
+ flash=1;flash2=t+.16;nextBolt=t+8+R()*10;
+ let x=WX+120+R()*(L-WX-200),y=0;const pts=[[x,y]];
+ while(y<340+R()*120){y+=25+R()*35;x+=(R()-.5)*60;pts.push([x,y]);}
+ bolt={pts,life:.35};
+ startleAt=t+.07;lookBoltX=x;lookBoltUntil=t+1.6;
+ const near=R()<.45;
+ thunder(near?.18:.7+R()*1.4,near);
+ if(t<petUntil){petUntil=t;setPurr(false);}
+}
+function pet(t){
+ if(startle>.3)return;
+ if(t>=petUntil)chirp();
+ petUntil=t+4.5;
+}
+
+// ---------- drawing ----------
+function halftoneGlow(cx,cy,rad,col){
+ g.beginPath();const s=13;
+ for(let y=cy-rad;y<cy+rad;y+=s)for(let x=cx-rad;x<cx+rad;x+=s){
+  const dd=Math.hypot(x-cx,y-cy)/rad;if(dd>=1)continue;
+  const r=Math.pow(1-dd,1.4)*6.2;if(r<.4)continue;g.moveTo(x+r,y);g.arc(x,y,r,0,6.283);}
+ g.fillStyle=col;g.fill();
+}
+function curtainEdge(i,y,t){
+ const tie=Math.exp(-(((y-560)/250)**2))*.82;
+ const x0=i*34,xt=120+i*11;
+ return x0+(xt-x0)*tie+Math.sin(t*.8+i*.7)*4*(y/L)*(1-tie)+flash*6*(y/L)*(1-tie);
+}
+function catBodyPath(){
+ const p=new Path2D();
+ p.moveTo(555,SILL);
+ p.bezierCurveTo(505,790,525,650,600,585);
+ p.bezierCurveTo(622,562,632,535,640,505);
+ p.bezierCurveTo(680,490,725,492,758,512);
+ p.bezierCurveTo(770,545,790,570,815,600);
+ p.bezierCurveTo(880,670,885,810,830,SILL);
+ p.closePath();return p;
+}
+function catHeadPath(tw,s){
+ const p=new Path2D();
+ p.ellipse(700,448,80,70,0,0,6.283);
+ const lx=lerp(640,588,s),ly=lerp(338,396,s);
+ p.moveTo(628,432);p.lineTo(lx,ly);p.lineTo(695,386);p.closePath();
+ const rx=lerp(762+tw*.6,814,s),ry=lerp(338-tw,398,s);
+ p.moveTo(706,386);p.lineTo(rx,ry);p.lineTo(776,434);p.closePath();
+ return p;
+}
+function tailPath(amp){
+ const s=Math.sin(tailPh)*22*amp,s2=Math.sin(tailPh-.8)*14*amp;
+ const p=new Path2D();
+ p.moveTo(800,862);
+ p.bezierCurveTo(900,880,960+s2,850,945+s,790);
+ p.bezierCurveTo(935+s,760,905+s,752,895+s,770);
+ return p;
+}
+
+function drawScene(t){
+ g.setTransform(px,0,0,px,0,0);
+ g.fillStyle='#b83d17';g.fillRect(0,0,L,L);
+
+ g.save();g.beginPath();g.rect(WX,0,L-WX,SILL);g.clip();
+ const sky=g.createLinearGradient(0,0,0,SILL);
+ sky.addColorStop(0,'#2a3496');sky.addColorStop(.5,'#3f58cc');sky.addColorStop(1,'#51309c');
+ g.fillStyle=sky;g.fillRect(WX,0,L-WX,SILL);
+ for(const b of bokeh){g.globalAlpha=.35+.25*Math.sin(t*.9+b.p);g.fillStyle='#8fd3ff';
+  g.beginPath();g.arc(b.x,b.y,b.r,0,6.283);g.fill();}
+ g.globalAlpha=1;
+ if(bolt&&bolt.life>0){g.strokeStyle='rgba(255,170,240,.95)';g.lineWidth=5;g.lineJoin='round';
+  g.beginPath();bolt.pts.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.stroke();
+  g.strokeStyle='#fff';g.lineWidth=2;g.stroke();}
+ for(const b of buildings){g.fillStyle=b.c;g.fillRect(b.x,SILL-b.h,b.w,b.h);
+  g.fillStyle='#ffd83d';for(const w of b.wins)if(w.on)g.fillRect(w.x,w.y,9,11);}
+ const pulse=1+Math.sin(t*2.2)*.05;
+ g.globalCompositeOperation='lighter';
+ halftoneGlow(345,570,150*pulse,'rgba(255,196,60,.9)');
+ halftoneGlow(975,520,150*pulse,'rgba(255,196,60,.9)');
+ g.globalCompositeOperation='source-over';
+ g.strokeStyle='rgba(205,238,255,.55)';g.lineWidth=2;g.beginPath();
+ for(const r of rain){g.moveTo(r.x,r.y);g.lineTo(r.x-r.len*.06,r.y-r.len);}g.stroke();
+ if(flash>.02){g.fillStyle=`rgba(225,215,255,${flash*.55})`;g.fillRect(WX,0,L-WX,SILL);}
+ for(const b of beads){
+  g.fillStyle='rgba(30,30,110,.35)';g.beginPath();g.arc(b.x+b.r*.25,b.y+b.r*.3,b.r,0,6.283);g.fill();
+  g.fillStyle='rgba(185,230,255,.55)';g.beginPath();g.arc(b.x,b.y,b.r,0,6.283);g.fill();
+  if(b.r>2){g.fillStyle='rgba(255,255,255,.9)';g.beginPath();g.arc(b.x-b.r*.35,b.y-b.r*.35,b.r*.28,0,6.283);g.fill();}
+ }
+ g.restore();
+
+ g.fillStyle='#e24f93';g.fillRect(WX,288,L-WX,26);
+ g.fillStyle='rgba(255,255,255,.25)';g.fillRect(WX,288,L-WX,5);
+ g.fillStyle='#7a2710';g.fillRect(WX-14,0,20,SILL);
+ g.fillStyle='#d2561f';g.fillRect(0,SILL,L,L-SILL);
+ g.fillStyle='#8f2d10';g.fillRect(0,SILL,L,10);
+
+ const cols=['#f28a24','#d24d17','#f5a531','#c8431a','#ef7d22','#d9561a','#f29a2c'];
+ for(let i=0;i<7;i++){
+  g.beginPath();
+  for(let y=0;y<=L;y+=20)g.lineTo(curtainEdge(i,y,t),y);
+  for(let y=L;y>=0;y-=20)g.lineTo(curtainEdge(i+1,y,t)+2,y);
+  g.closePath();g.fillStyle=cols[i];g.fill();
+  g.strokeStyle='rgba(40,110,40,.75)';g.lineWidth=3;g.beginPath();
+  for(let y=0;y<=L;y+=20)g.lineTo(curtainEdge(i,y,t)+6,y);g.stroke();
+ }
+ g.fillStyle='#f2c230';g.beginPath();g.roundRect?g.roundRect(70,538,170,48,10):g.rect(70,538,170,48);g.fill();
+ g.fillStyle='rgba(160,90,10,.45)';for(let x=82;x<232;x+=14)for(let y=548;y<582;y+=12){g.beginPath();g.arc(x,y,2.4,0,6.283);g.fill();}
+
+ g.fillStyle='#ef5aa6';g.beginPath();g.ellipse(690,890,215,38,0,0,6.283);g.fill();
+ g.strokeStyle='rgba(255,220,240,.9)';g.lineWidth=3;g.beginPath();
+ for(let x=500,k=0;x<=880;x+=16,k++)g.lineTo(x,890+(k%2?9:-5));g.stroke();
+
+ const s=Math.pow(startle,.6);
+ const breath=(1+Math.sin(t*(1.6+purr*.8))*.012)*(1-.04*s);
+ const vib=Math.sin(t*75)*1.3*purr;
+ const tilt=headTurn*.2+Math.sin(t*.35)*.03-purr*.08;
+ const headDX=headTurn*22+vib, headDY=(1-breath)*-380+14*s+10*purr;
+ const tw=(t-twitchT<.3&&s<.1)?Math.sin((t-twitchT)/.3*Math.PI)*14:0;
+ const body=catBodyPath(),head=catHeadPath(tw,s),tail=tailPath(1+s*.6-purr*.6);
+ const tailW=26+14*s;
+ const withBody=f=>{g.save();g.translate(690+vib,SILL);g.scale(1+.02*s,breath);g.translate(-690,-SILL);f();g.restore();};
+ const withHead=f=>{g.save();g.translate(headDX,headDY);g.translate(700,520);g.rotate(tilt);g.translate(-700,-520);f();g.restore();};
+ const rim=(col,w,dx,dy)=>{
+  g.lineJoin='round';g.lineCap='round';
+  g.save();g.translate(dx,dy);
+  g.strokeStyle=col;g.lineWidth=tailW+w-1;g.stroke(tail);
+  withBody(()=>{g.lineWidth=w;g.stroke(body);});
+  withHead(()=>{g.lineWidth=w;g.stroke(head);});
+  g.restore();
+ };
+ g.globalAlpha=.55;rim('#35d7ff',9,-5,3);rim('#ff3ab0',9,5,-2);g.globalAlpha=1;
+ rim(purr>.05?`rgb(255,${138+Math.round(60*purr)},${42+Math.round(80*purr)})`:'#ff8a2a',9,0,0);
+ g.strokeStyle='#120c16';g.lineWidth=tailW;g.stroke(tail);
+ g.fillStyle='#120c16';
+ withBody(()=>g.fill(body));
+ withHead(()=>{g.fill(head);
+  const spread=12*s;
+  g.strokeStyle='rgba(255,245,230,.85)';g.lineWidth=2;g.beginPath();
+  g.moveTo(632,478);g.lineTo(545,462-spread);g.moveTo(634,488);g.lineTo(548,492+spread);
+  g.moveTo(768,478);g.lineTo(858,458-spread);g.moveTo(766,488);g.lineTo(855,490+spread);g.stroke();});
+ if(flash>.05){g.globalAlpha=flash*.6;rim('#e6e0ff',5,0,0);g.globalAlpha=1;}
+ if(purr>.05){g.fillStyle=`rgba(255,120,190,${purr*.8})`;
+  for(let i=0;i<5;i++){const ph=(t*.6+i/5)%1;const x=700+Math.sin(i*2.3+t)*70,y=380-ph*220;
+   g.beginPath();g.arc(x,y,(1-ph)*9,0,6.283);g.fill();}}
+}
+
+function compose(){
+ const n=cv.width;
+ ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+ ctx.drawImage(scene,0,0);
+ ctx.globalCompositeOperation='multiply';ctx.globalAlpha=.55;ctx.drawImage(texLinen,0,0);
+ ctx.globalCompositeOperation='overlay';ctx.globalAlpha=.6;ctx.drawImage(texDots,0,0);
+ ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.fillStyle=vign;ctx.fillRect(0,0,n,n);
+}
+
+let last=performance.now(),T=0;
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;T+=dt;
+ update(dt,T);audioTick(dt);drawScene(T);compose();
+ requestAnimationFrame(frame);
+}
+cv.addEventListener('click',e=>{
+ const r=cv.getBoundingClientRect();
+ const x=(e.clientX-r.left)/r.width*L,y=(e.clientY-r.top)/r.height*L;
+ if(AC&&soundOn)AC.resume();
+ if(x>530&&x<900&&y>320&&y<SILL+30)pet(T);else strike(T);
+});
+new ResizeObserver(resize).observe(cv);
+resize();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

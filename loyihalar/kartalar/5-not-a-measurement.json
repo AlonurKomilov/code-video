@@ -1,10 +1,10 @@
 {
  "nom": "Not A Measurement",
  "manba": [
-  "../../not-a-measurement.html"
+  "../../not-a-measurement/not-a-measurement.html"
  ],
  "kadr": {
-  "fayl": "../../not-a-measurement.html",
+  "fayl": "../../not-a-measurement/not-a-measurement.html",
   "kadrlar": [
    5,
    12,

@@ -1,0 +1,892 @@
+<title>Masofa Maydoni</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+ :root{--pa:#ecedf0;--ink:#15171d;--mut:#646c7c;--rule:#c9ccd4;--stage:#d8dce2;--acc:#b0432a;
+  --disp:"Archivo",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+ @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --pa:#0b0c10;--ink:#e6e8ee;--mut:#8790a0;--rule:#282c36;--stage:#14161c;--acc:#d9613f}}
+ :root[data-theme="dark"]{--pa:#0b0c10;--ink:#e6e8ee;--mut:#8790a0;--rule:#282c36;--stage:#14161c;--acc:#d9613f}
+ *{box-sizing:border-box}
+ body{background:var(--pa);color:var(--ink);font:400 14px/1.6 var(--mono);margin:0}
+ .wrap{max-width:660px;margin:0 auto;padding-block:26px 48px;padding-left:16px;padding-right:16px}
+ h1{font:700 19px/1.15 var(--disp);letter-spacing:.015em;margin:0 0 4px;text-wrap:balance}
+ .sub{color:var(--mut);font-size:12.5px;margin:0 0 20px;max-width:52ch}
+ .stage{position:relative;background:var(--stage);border:1px solid var(--rule);overflow:hidden}
+ canvas{display:block;width:100%;height:auto;max-width:100%}
+ .hud{position:absolute;left:0;bottom:0;font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  color:#22262e;background:rgba(255,255,255,.68);padding:3px 8px}
+ .bar{display:flex;flex-wrap:wrap;gap:7px;align-items:baseline;margin-top:12px}
+ .bar span{color:var(--mut);font-size:11px;letter-spacing:.09em;text-transform:uppercase;margin-right:2px}
+ button{font:500 11.5px/1 var(--mono);letter-spacing:.06em;background:transparent;color:var(--ink);
+  cursor:pointer;border:1px solid var(--rule);padding:7px 11px}
+ button:hover{border-color:var(--ink)}
+ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+ button[aria-pressed="true"]{background:var(--ink);color:var(--pa);border-color:var(--ink)}
+ dl{display:grid;grid-template-columns:max-content 1fr;gap:5px 18px;margin:22px 0 0;
+  padding-top:16px;border-top:1px solid var(--rule);font-size:12.5px}
+ dt{color:var(--mut);letter-spacing:.05em}
+ dd{margin:0;font-variant-numeric:tabular-nums}
+ code{font:inherit;color:var(--mut)}
+ .note{color:var(--mut);font-size:12.5px;margin:18px 0 0;max-width:56ch}
+ .note em{color:var(--ink);font-style:normal;border-bottom:1px solid var(--acc)}
+</style>
+<div class="wrap">
+ <h1>Masofa maydoni</h1>
+ <p class="sub">Bitta fayl, nol bayt asset. Na rasm, na mesh, na video — butun kadr
+  masofa funksiyasidan hisoblanadi, kadr boshiga.</p>
+ <div class="stage"><canvas id="c"></canvas><span class="hud" id="hud">—</span></div>
+ <div class="bar">
+  <button id="play" aria-pressed="true">Pauza</button>
+  <span>qahramon</span><button id="ch0"></button><button id="ch1"></button>
+  <span>sahna</span><button id="sc0" aria-pressed="true">dala</button><button id="sc1">ko'cha</button><button id="sc2">yaqin</button>
+  <span>chiziq</span><button id="ln" aria-pressed="true">bor</button>
+  <span>sifat</span><button id="q0">past</button><button id="q1" aria-pressed="true">o'rta</button><button id="q2">yuqori</button>
+ </div>
+ <dl>
+  <dt>Ekspozitsiya</dt><dd>16 chizma · ushlash 3·2·1·2 · 12 chizma/s</dd>
+  <dt>Aktiv</dt><dd id="s2">—</dd>
+  <dt>Kadr oralig'i</dt><dd id="s3">—</dd>
+  <dt>Manba</dt><dd id="s4">qalpoqli — characters/hooded-walker.json</dd>
+  <dt>O'tishlar</dt><dd>1 — o'lchov (G-bufer) · 2 — qaror (band, chiziq, qog'oz)</dd>
+  <dt>Ko'cha</dt><dd>~40 qator — bitta bino, qolgani <code>mod</code> dan</dd>
+  <dt>Yuz</dt><dd>dekal — geometriya emas, normal fazoda chiziladi</dd>
+ </dl>
+ <p class="note">Figura 2D jadvaldagi <em>o'sha</em> pozalardan quriladi. Ikkala
+  qahramon ham JSON hujjat — <code>build.mjs</code> ulardan shader yozadi.</p>
+ <p class="note">Ko'chada hech narsa ikki marta modellashtirilmagan: bitta quti
+  yozilgan, fazo uning ostida <em>buklangan</em>, katak raqami esa balandlik, eni va
+  chekinish uchun xeshlangan. Yuzta bino bittasi bilan bir xil turadi — binolar soni
+  7.6 barobar oshganda kadr vaqti 0.99 barobar bo'ldi.</p>
+ <p class="note">Ko'z geometriya emas. Kosaga solingan shar sifatida modellashtirilsa
+  har nurning har qadamiga tushadi va baribir noto'g'ri o'qiladi — chunki chizilgan
+  yuzni <em>chiziq</em> yasaydi: yuqori qovoqning qalinligi, qosh, og'iz burchagi.
+  Shuning uchun yuz — urilish nuqtasida bir marta hisoblanadigan dekal, va u
+  sirtning normalidan olingan ramkada chiziladi, shuning uchun kallaga
+  <em>o'raladi</em>, ustiga yopishtirilmaydi.</p>
+ <p class="note">Chizilgan chiziq konturdan boshqa narsa: u ko'z bir shaklni
+  ikkinchisida yo'qotadigan joyda paydo bo'ladi — chuqurlik sakragan, burma
+  keskin, yoki material o'zgargan joyda. Uchalasi ham <em>qo'shni piksel</em>ni
+  talab qiladi, shuning uchun qaror ikkinchi o'tishga ko'chdi. O'sha yerda
+  yorug'lik-soya chegarasi ham egrilikka qarab sinadi: burmada ko'proq,
+  tekis joyda deyarli yo'q.</p>
+</div>
+<script id="fs-walker" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+uniform vec2  iRes;
+uniform vec3  J[16];      // the drawing's joints, lifted into 3D
+uniform float iTime;
+uniform float iDist;   // how far he has walked, so the ground moves under him
+uniform float uScene;  // 0 the empty field, 1 the street
+uniform float uCell;   // how tightly the street is packed -- for the cost experiment
+uniform float uNbr;    // 1 evaluate the neighbouring cells, 0 do not -- the known-bad case
+/* Joint indices: 0 hip 1 shoulder 2 head 3 neck
+   near 4 knee 5 ankle 6 toe 7 elbow 8 hand
+   far  9 knee 10 ankle 11 toe 12 elbow 13 hand
+   14 cloak mid  15 cloak hem                                */
+
+#define PI 3.14159265
+
+/* ---------- distance primitives (iq) ---------- */
+float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
+ vec3 ba=b-a; float l2=dot(ba,ba), rr=r1-r2, a2=l2-rr*rr, il2=1.0/l2;
+ vec3 pa=p-a; float y=dot(pa,ba), z=y-l2;
+ vec3 xv=pa*l2-ba*y; float x2=dot(xv,xv), y2=y*y*l2, z2=z*z*l2;
+ float k=sign(rr)*rr*rr*x2;
+ if(sign(z)*a2*z2>k) return sqrt(x2+z2)*il2-r2;
+ if(sign(y)*a2*y2<k) return sqrt(x2+y2)*il2-r1;
+ return (sqrt(x2*a2*il2)+y*rr)*il2-r1;
+}
+float sdEllipsoid(vec3 p, vec3 r){
+ float k0=length(p/r), k1=length(p/(r*r));
+ return k0*(k0-1.0)/k1;
+}
+float sdBoxR(vec3 p, vec3 b, float r){
+ vec3 q=abs(p)-b; return length(max(q,0.0))+min(max(q.x,max(q.y,q.z)),0.0)-r;
+}
+float sdSheet(vec3 p, vec3 a, vec3 b, float r1, float r2, float thin, float wide){
+ vec3 s=vec3(thin,1.0,wide);
+ return sdRoundCone(p/s, a/s, b/s, r1, r2)*min(thin,min(1.0,wide));
+}
+float smin(float a,float b,float k){
+ float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h);
+}
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){
+ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+ return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+            mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+}
+
+/* ---------- the body ---------- */
+/* MAT 1 coat  2 boot  3 skin/hood-lining  4 blade  10 snow */
+
+/* hooded-walker -- generated from characters/hooded-walker.json, do not hand-edit */
+vec2 mapFig(vec3 p){
+ float d,t;
+ d=sdEllipsoid(p-J[0]-vec3(0.0,0.02,0.0),vec3(0.075,0.07,0.09));   // pelvis
+ d=smin(d,sdEllipsoid(p-mix(J[0],J[1],0.55)-vec3(0.012,0.01,0.0),vec3(0.086,0.105,0.1)),0.055);   // ribcage
+ d=smin(d,smin(sdRoundCone(p,J[1],J[3],0.038,0.03),sdEllipsoid(p-mix(J[3],J[1],0.3)-vec3(0.006,0.0,0.0),vec3(0.05,0.032,0.056)),0.022),0.04);   // neck and scarf
+ d=smin(d,smin(sdRoundCone(p,(J[0]+vec3(0.0,0.0,0.045)),J[4],0.062,0.046),sdRoundCone(p,J[4],J[5],0.047,0.032),0.03),0.045);   // near leg
+ d=smin(d,smin(sdRoundCone(p,(J[0]+vec3(0.0,0.0,-0.045)),J[9],0.058,0.043),sdRoundCone(p,J[9],J[10],0.044,0.03),0.03),0.045);   // far leg
+ d=smin(d,smin(sdRoundCone(p,(J[1]+vec3(0.0,0.0,0.075)),J[7],0.046,0.034),sdRoundCone(p,J[7],J[8],0.035,0.026),0.026),0.038);   // near arm
+ d=smin(d,smin(sdRoundCone(p,(J[1]+vec3(0.0,0.0,-0.075)),J[12],0.043,0.032),sdRoundCone(p,J[12],J[13],0.033,0.024),0.026),0.038);   // far arm
+ d=smin(d,sdEllipsoid(p-J[1]-vec3(0.004,0.012,0.0),vec3(0.07,0.052,0.128)),0.04);   // coat shoulders: the hard horizontal top a body does not have
+ vec2 r=vec2(d,1.0);
+ t=min(sdSheet(p,(J[0]+vec3(0.006,0.014,0.062)),vec3((mix(J[0].x,J[4].x,0.3)-0.022),(J[0].y-0.215),0.086),0.052,0.076,1.15,0.26),sdSheet(p,(J[0]+vec3(0.006,0.014,-0.062)),vec3((mix(J[0].x,J[9].x,0.3)-0.022),(J[0].y-0.215),-0.086),0.052,0.076,1.15,0.26)); if(t<r.x) r=vec2(t,5.0);   // two long panels, hard-edged so the legs read between them
+ t=smin(sdSheet(p,(J[1]+vec3(-0.02,0.02,0.0)),(J[14]+vec3(-0.016,0.0,0.0)),0.052,0.088,0.34,1.45),sdSheet(p,(J[14]+vec3(-0.016,0.0,0.0)),J[15],0.088,0.15,0.3,1.55),0.045); if(t<r.x) r=vec2(t,6.0);   // a sheet: thin front to back, wide across, flaring to the hem
+ t=min(sdRoundCone(p,J[5],J[6],0.041,0.031),sdRoundCone(p,J[10],J[11],0.039,0.029)); if(t<r.x) r=vec2(t,2.0);
+ t=sdEllipsoid(p-J[2],vec3(0.053,0.059,0.05)); if(t<r.x) r=vec2(t,3.0);   // the face, inside the hood
+ t=min(max(sdEllipsoid(p-J[2]-vec3(-0.01,0.007,0.0),vec3(0.07,0.074,0.066)),-(sdEllipsoid(p-J[2]-vec3(0.064,-0.006,0.0),vec3(0.052,0.046,0.044)))),sdRoundCone(p,J[3],(J[2]+vec3(-0.02,-0.04,0.0)),0.05,0.062)); if(t<r.x) r=vec2(t,1.0);   // the hood: a shell with the face opening cut out, sitting on the shoulders
+ return r;
+}
+
+float h11(float n){return fract(sin(n*127.1)*43758.5453);}
+
+/* ===== R5. A STREET FROM ONE BUILDING =====
+   Nothing here is modelled twice. One box is written; the world folds space under it
+   with mod, and the cell index is hashed for height, width and setback, so every
+   building along the row is a different building. A hundred of them cost the same
+   as one, and the file does not grow.
+
+   The care needed: folding space breaks the distance bound at a cell wall, because
+   the nearest surface may be in the NEXT cell. Evaluating the neighbours restores
+   it -- skip that and rays tunnel straight through the walls. */
+vec2 mapEnv(vec3 p){
+ vec3 q=p-vec3(iDist,0.0,0.0);
+ float d,m;
+ /* ground: the road is flatter and darker than the snow either side of it */
+ vec2 w=vec2(q.x*0.40+q.z*0.92, q.z*0.40-q.x*0.92);
+ float road=smoothstep(1.55,1.15,abs(q.z-0.35));
+ float g=p.y + mix(vnoise(w*vec2(2.2,15.0))*0.016+vnoise(w*vec2(7.0,44.0))*0.005,
+                   vnoise(q.xz*vec2(3.0,9.0))*0.004, road)
+             + vnoise(q.xz*70.0)*0.0016;
+ d=g; m=mix(10.0,14.0,step(0.5,road));
+
+ if(uScene>0.5){
+  float CELL=uCell>0.01?uCell:3.05;
+  for(int row=0;row<3;row++){
+   /* a terrace either side of the street, and a third block behind the far one */
+   float zc = row==0 ? -4.85 : (row==1 ? 2.60 : 9.90);
+   float sc = row==2 ? 1.9 : 1.0;
+   float id0=floor((q.x+float(row)*1.7)/CELL);
+   int kk=uNbr>0.5?1:0;
+   for(int k=-kk;k<=kk;k++){                      // the neighbours, or rays tunnel through
+    float id=id0+float(k);
+    float r1=h11(id*1.7+float(row)*31.0), r2=h11(id*4.3+float(row)*57.0), r3=h11(id*9.1+float(row)*11.0);
+    float ws=min(CELL/3.05,1.0);
+   float h=(2.6+r1*4.4)*sc, wd=(1.05+r2*0.42)*sc*ws, dp=(1.25+r3*0.55)*sc;
+    vec3 c=vec3(CELL*(id+0.5)-float(row)*1.7, 0.0, zc+(r3-0.5)*0.34*sc);
+    float b=sdBoxR(q-c-vec3(0.0,h*0.5,0.0), vec3(wd,h*0.5,dp), 0.02);
+    if(b<d){d=b;m=11.0;}
+    /* a parapet, so the roofline is not a plain lid */
+    float pa=sdBoxR(q-c-vec3(0.0,h+0.055*sc,0.0), vec3(wd*1.04,0.055*sc,dp*1.04), 0.015);
+    if(pa<d){d=pa;m=13.0;}
+   }
+  }
+  /* lamp posts, on their own smaller cell */
+  const float LC=4.85;
+  float lid0=floor((q.x-1.2)/LC);
+  int lk=uNbr>0.5?1:0;
+  for(int k=-lk;k<=lk;k++){
+   float lid=lid0+float(k);
+   vec3 c=vec3(1.2+LC*(lid+0.5), 0.0, 1.02);
+   float post=sdRoundCone(q-c, vec3(0.0,0.0,0.0), vec3(0.0,2.30,0.0), 0.055, 0.032);
+   float arm =sdRoundCone(q-c, vec3(0.0,2.26,0.0), vec3(0.0,2.34,-0.42), 0.030, 0.026);
+   float lamp=sdEllipsoid(q-c-vec3(0.0,2.26,-0.46), vec3(0.11,0.13,0.11));
+   float l=min(post,min(arm,lamp));
+   if(l<d){d=l;m= lamp<min(post,arm) ? 15.0 : 13.0;}
+  }
+ }
+ return vec2(d,m);
+}
+
+vec2 map(vec3 p){
+ vec2 f=mapFig(p);
+ vec2 e=mapEnv(p);
+ if(e.x<f.x) f=e;
+ return f;
+}
+vec3 calcN(vec3 p){
+ vec2 e=vec2(1.0,-1.0)*0.0012;
+ return normalize(e.xyy*map(p+e.xyy).x + e.yyx*map(p+e.yyx).x +
+                  e.yxy*map(p+e.yxy).x + e.xxx*map(p+e.xxx).x);
+}
+float shadow(vec3 ro, vec3 rd, float k){
+ float res=1.0,t=0.045;
+ for(int i=0;i<40;i++){
+  float h=map(ro+rd*t).x;
+  res=min(res,k*h/t); if(res<0.003||t>3.0)break;
+  t+=clamp(h,0.006,0.10);
+ }
+ return clamp(res,0.0,1.0);
+}
+float ao(vec3 p, vec3 n){
+ float o=0.0,s=1.0;
+ for(int i=0;i<5;i++){ float h=0.012+0.055*float(i); o+=(h-map(p+n*h).x)*s; s*=0.72; }
+ return clamp(1.0-1.6*o,0.0,1.0);
+}
+
+/* PASS ONE writes what was MEASURED about the surface and decides nothing about how
+   it looks. Banding, line art and paper all need to see a pixel's neighbours, and a
+   fragment shader cannot. So the look is settled in pass two, which can. */
+layout(location=0) out vec4 gA;   // lit, occlusion, rim, distance
+layout(location=1) out vec4 gB;   // normal, material
+
+void main(){
+ vec2 uv=(gl_FragCoord.xy-0.5*iRes)/iRes.y;
+ vec3 hd0=J[2];
+ vec3 ta = uScene<1.5 ? mix(vec3(0.02,0.50,0.0), vec3(4.60,1.05,-0.35), uScene)
+                      : hd0+vec3(0.010,-0.004,0.0);
+ vec3 ro = uScene<1.5 ? ta+mix(vec3(0.74,0.30,-3.10), vec3(-13.20,0.50,-0.90), uScene)
+                      : ta+vec3(0.400,0.055,-0.300);
+ float foc = uScene<1.5 ? mix(2.25,2.30,uScene) : 2.55;
+ float far = uScene<1.5 ? mix(7.0,62.0,uScene) : 3.0;
+ vec3 f=normalize(ta-ro), rgt=normalize(cross(vec3(0,1,0),f)), up=cross(f,rgt);
+ vec3 rd=normalize(uv.x*rgt+uv.y*up+foc*f);
+
+ float t=0.05, near=1e9, nearT=0.0, mat=-1.0;
+ for(int i=0;i<180;i++){
+  vec3 p=ro+rd*t;
+  vec2 h=map(p);
+  if(h.x/t<near){ near=h.x/t; nearT=t; }
+  if(h.x<0.0008*max(t,1.0)){ mat=h.y; break; }   // one pixel is bigger further away
+  t+=h.x*0.92; if(t>far)break;
+ }
+ if(mat<0.0){         // a miss still carries the near-miss, and how far away it was
+  gA=vec4(nearT,0.0,0.0,near); gB=vec4(0.5,0.5,0.5,0.0); return;
+ }
+ vec3 p=ro+rd*t, n=calcN(p);
+ vec3 L =normalize(vec3(-0.34,0.60, 0.72));
+ vec3 B =normalize(vec3( 0.30,-0.80,-0.52));
+ float dif=max(dot(n,L),0.0);
+ float sh =shadow(p+n*0.012,L,11.0);
+ float occ=ao(p,n);
+ float bnc=max(dot(n,B),0.0);
+ float sky=0.5+0.5*n.y;
+ float lit=dif*mix(0.10,1.0,sh)*0.92 + bnc*0.52 + sky*0.085;
+ float rim=pow(clamp(1.0-dot(n,-rd),0.0,1.0),1.9)*pow(max(dot(n,L),0.0),0.7);
+ /* ===== R4. THE FACE =====
+    An eye is not geometry. Modelled as a ball in a socket it costs every ray every
+    step and still reads wrong, because what makes a drawn face is the LINE -- the
+    weight of the upper lid, the brow, the corner of the mouth. So the face is a
+    decal, evaluated once at the hit, in a frame taken from the surface normal so it
+    wraps around the skull instead of being projected flat onto it. */
+ if(mat>2.5&&mat<3.5){
+  vec3 hn=normalize((p-J[2])/vec3(0.053,0.059,0.050));
+  if(hn.x>0.16){
+   vec2 f=vec2(hn.z,hn.y)/hn.x;            // gnomonic: the face plane, seen from inside
+   f.y-=0.015;
+   vec2 e=vec2(abs(f.x)-0.275, f.y-0.060);
+   float eye =length(e/vec2(0.235,0.170))-1.0;
+   float iris=length((e-vec2(0.018,-0.012))/vec2(0.118,0.140))-1.0;
+   float pup =length((e-vec2(0.018,-0.012))/vec2(0.052,0.062))-1.0;
+   float lid =length((e-vec2(0.0,0.128))/vec2(0.262,0.152))-1.0;   // the heavy upper line
+   /* mirrored about the centre line, a brow wide enough to sit over the eye also
+      reaches across the nose and meets its own reflection -- one black bar instead
+      of two brows. It has to be held off the centre. */
+   float brow=length((e-vec2(-0.022,0.400))/vec2(0.200,0.044))-1.0;
+   if(abs(f.x)<0.105) brow=1.0;
+   float mth =length((f-vec2(0.010,-0.285))/vec2(0.105,0.026))-1.0;
+   float nse =length((f-vec2(0.060,-0.135))/vec2(0.034,0.090))-1.0;
+   /* the catchlight. One bright dot is the difference between an eye and a bead --
+      it is the only thing in the drawing that says the eye is wet. */
+   float cat =length((e-vec2(-0.072,0.062))/vec2(0.044,0.050))-1.0;
+   if(eye<0.0)  mat=16.0;
+   if(iris<0.0) mat=17.0;
+   if(pup<0.0)  mat=18.0;
+   if(lid<0.0&&eye>-0.20) mat=18.0;        // the lash sits ON the eye's upper edge
+   if(brow<0.0) mat=18.0;
+   if(mth<0.0)  mat=18.0;
+   if(nse<0.0&&f.y<-0.075) mat=19.0;       // one soft line for the nose, no more
+   if(cat<0.0&&eye<0.0) mat=20.0;
+  }
+ }
+
+ /* windows are a decision made ONCE, at the hit, from the point itself -- carving
+    them into the field would cost every step of every ray for the same picture */
+ if(mat>10.5&&mat<11.5){
+  vec3 q=p-vec3(iDist,0.0,0.0);
+  /* which pair of axes the grid runs in depends on WHICH FACE we hit: use the same
+     pair on every face and the windows smear into bands down the sides. */
+  vec3 an=abs(n);
+  vec2 gq=(an.z>an.x? vec2(q.x,q.y) : vec2(q.z,q.y))*2.35;
+  vec2 fr=fract(gq);
+  if(fr.x>0.22&&fr.x<0.78&&fr.y>0.26&&fr.y<0.74&&q.y>0.55)
+   mat = h11(floor(gq.x)*13.0+floor(gq.y)*7.0)>0.52 ? 15.0 : 12.0;
+ }
+ gA=vec4(lit,occ,rim,t);
+ gB=vec4(n*0.5+0.5, mat/32.0);
+}
+</script>
+<script id="fs-guard" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+uniform vec2  iRes;
+uniform vec3  J[16];      // the drawing's joints, lifted into 3D
+uniform float iTime;
+uniform float iDist;   // how far he has walked, so the ground moves under him
+uniform float uScene;  // 0 the empty field, 1 the street
+uniform float uCell;   // how tightly the street is packed -- for the cost experiment
+uniform float uNbr;    // 1 evaluate the neighbouring cells, 0 do not -- the known-bad case
+/* Joint indices: 0 hip 1 shoulder 2 head 3 neck
+   near 4 knee 5 ankle 6 toe 7 elbow 8 hand
+   far  9 knee 10 ankle 11 toe 12 elbow 13 hand
+   14 cloak mid  15 cloak hem                                */
+
+#define PI 3.14159265
+
+/* ---------- distance primitives (iq) ---------- */
+float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
+ vec3 ba=b-a; float l2=dot(ba,ba), rr=r1-r2, a2=l2-rr*rr, il2=1.0/l2;
+ vec3 pa=p-a; float y=dot(pa,ba), z=y-l2;
+ vec3 xv=pa*l2-ba*y; float x2=dot(xv,xv), y2=y*y*l2, z2=z*z*l2;
+ float k=sign(rr)*rr*rr*x2;
+ if(sign(z)*a2*z2>k) return sqrt(x2+z2)*il2-r2;
+ if(sign(y)*a2*y2<k) return sqrt(x2+y2)*il2-r1;
+ return (sqrt(x2*a2*il2)+y*rr)*il2-r1;
+}
+float sdEllipsoid(vec3 p, vec3 r){
+ float k0=length(p/r), k1=length(p/(r*r));
+ return k0*(k0-1.0)/k1;
+}
+float sdBoxR(vec3 p, vec3 b, float r){
+ vec3 q=abs(p)-b; return length(max(q,0.0))+min(max(q.x,max(q.y,q.z)),0.0)-r;
+}
+float sdSheet(vec3 p, vec3 a, vec3 b, float r1, float r2, float thin, float wide){
+ vec3 s=vec3(thin,1.0,wide);
+ return sdRoundCone(p/s, a/s, b/s, r1, r2)*min(thin,min(1.0,wide));
+}
+float smin(float a,float b,float k){
+ float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h);
+}
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){
+ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+ return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+            mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+}
+
+/* ---------- the body ---------- */
+/* MAT 1 coat  2 boot  3 skin/hood-lining  4 blade  10 snow */
+
+/* plated-guard -- generated from characters/plated-guard.json, do not hand-edit */
+vec2 mapFig(vec3 p){
+ float d,t;
+ d=sdEllipsoid(p-J[0]-vec3(0.0,0.015,0.0),vec3(0.086,0.078,0.102));   // hips, heavier than a man's
+ d=smin(d,sdEllipsoid(p-mix(J[0],J[1],0.62)-vec3(0.01,0.012,0.0),vec3(0.096,0.118,0.116)),0.06);   // breastplate: one big barrel, no waist
+ d=smin(d,sdRoundCone(p,J[1],J[3],0.052,0.044),0.045);   // gorget
+ d=smin(d,smin(sdRoundCone(p,(J[0]+vec3(0.0,0.0,0.05)),J[4],0.072,0.054),sdRoundCone(p,J[4],J[5],0.056,0.038),0.034),0.05);   // near leg
+ d=smin(d,smin(sdRoundCone(p,(J[0]+vec3(0.0,0.0,-0.05)),J[9],0.068,0.051),sdRoundCone(p,J[9],J[10],0.053,0.036),0.034),0.05);   // far leg
+ d=smin(d,smin(sdRoundCone(p,(J[1]+vec3(0.0,0.0,0.082)),J[7],0.056,0.042),sdRoundCone(p,J[7],J[8],0.044,0.032),0.03),0.042);   // near arm
+ d=smin(d,smin(sdRoundCone(p,(J[1]+vec3(0.0,0.0,-0.082)),J[12],0.052,0.039),sdRoundCone(p,J[12],J[13],0.041,0.03),0.03),0.042);   // far arm
+ vec2 r=vec2(d,1.0);
+ t=min(sdEllipsoid(p-J[1]-vec3(0.006,0.008,0.074),vec3(0.086,0.07,0.078)),sdEllipsoid(p-J[1]-vec3(0.006,0.008,-0.074),vec3(0.082,0.067,0.074))); if(t<r.x) r=vec2(t,3.0);   // pauldrons: the whole silhouette is these two
+ t=min(sdSheet(p,(J[0]+vec3(0.008,0.01,0.058)),(J[0]+vec3(-0.014,-0.115,0.078)),0.058,0.07,1.05,0.3),sdSheet(p,(J[0]+vec3(0.008,0.01,-0.058)),(J[0]+vec3(-0.014,-0.115,-0.078)),0.058,0.07,1.05,0.3)); if(t<r.x) r=vec2(t,3.0);   // tassets, short and hard
+ t=smin(sdSheet(p,(J[3]+vec3(-0.018,-0.014,0.0)),(J[14]+vec3(0.004,0.034,0.0)),0.024,0.038,0.28,0.8),sdSheet(p,(J[14]+vec3(0.004,0.034,0.0)),(J[15]+vec3(-0.018,0.07,0.0)),0.038,0.05,0.24,0.85),0.038); if(t<r.x) r=vec2(t,4.0);   // one warm thing on a cold man
+ t=min(sdRoundCone(p,J[5],J[6],0.05,0.038),sdRoundCone(p,J[10],J[11],0.048,0.036)); if(t<r.x) r=vec2(t,2.0);   // sabatons
+ t=min(max(sdEllipsoid(p-J[2]-vec3(-0.004,0.004,0.0),vec3(0.072,0.076,0.066)),-(sdBoxR(p-(J[2]+vec3(0.052,0.002,0.0)),vec3(0.052,0.011,0.062),0.004))),sdRoundCone(p,J[3],(J[2]+vec3(-0.01,-0.03,0.0)),0.054,0.064)); if(t<r.x) r=vec2(t,3.0);   // the helm sits ON the gorget, with a visor slot cut through it
+ return r;
+}
+
+float h11(float n){return fract(sin(n*127.1)*43758.5453);}
+
+/* ===== R5. A STREET FROM ONE BUILDING =====
+   Nothing here is modelled twice. One box is written; the world folds space under it
+   with mod, and the cell index is hashed for height, width and setback, so every
+   building along the row is a different building. A hundred of them cost the same
+   as one, and the file does not grow.
+
+   The care needed: folding space breaks the distance bound at a cell wall, because
+   the nearest surface may be in the NEXT cell. Evaluating the neighbours restores
+   it -- skip that and rays tunnel straight through the walls. */
+vec2 mapEnv(vec3 p){
+ vec3 q=p-vec3(iDist,0.0,0.0);
+ float d,m;
+ /* ground: the road is flatter and darker than the snow either side of it */
+ vec2 w=vec2(q.x*0.40+q.z*0.92, q.z*0.40-q.x*0.92);
+ float road=smoothstep(1.55,1.15,abs(q.z-0.35));
+ float g=p.y + mix(vnoise(w*vec2(2.2,15.0))*0.016+vnoise(w*vec2(7.0,44.0))*0.005,
+                   vnoise(q.xz*vec2(3.0,9.0))*0.004, road)
+             + vnoise(q.xz*70.0)*0.0016;
+ d=g; m=mix(10.0,14.0,step(0.5,road));
+
+ if(uScene>0.5){
+  float CELL=uCell>0.01?uCell:3.05;
+  for(int row=0;row<3;row++){
+   /* a terrace either side of the street, and a third block behind the far one */
+   float zc = row==0 ? -4.85 : (row==1 ? 2.60 : 9.90);
+   float sc = row==2 ? 1.9 : 1.0;
+   float id0=floor((q.x+float(row)*1.7)/CELL);
+   int kk=uNbr>0.5?1:0;
+   for(int k=-kk;k<=kk;k++){                      // the neighbours, or rays tunnel through
+    float id=id0+float(k);
+    float r1=h11(id*1.7+float(row)*31.0), r2=h11(id*4.3+float(row)*57.0), r3=h11(id*9.1+float(row)*11.0);
+    float ws=min(CELL/3.05,1.0);
+   float h=(2.6+r1*4.4)*sc, wd=(1.05+r2*0.42)*sc*ws, dp=(1.25+r3*0.55)*sc;
+    vec3 c=vec3(CELL*(id+0.5)-float(row)*1.7, 0.0, zc+(r3-0.5)*0.34*sc);
+    float b=sdBoxR(q-c-vec3(0.0,h*0.5,0.0), vec3(wd,h*0.5,dp), 0.02);
+    if(b<d){d=b;m=11.0;}
+    /* a parapet, so the roofline is not a plain lid */
+    float pa=sdBoxR(q-c-vec3(0.0,h+0.055*sc,0.0), vec3(wd*1.04,0.055*sc,dp*1.04), 0.015);
+    if(pa<d){d=pa;m=13.0;}
+   }
+  }
+  /* lamp posts, on their own smaller cell */
+  const float LC=4.85;
+  float lid0=floor((q.x-1.2)/LC);
+  int lk=uNbr>0.5?1:0;
+  for(int k=-lk;k<=lk;k++){
+   float lid=lid0+float(k);
+   vec3 c=vec3(1.2+LC*(lid+0.5), 0.0, 1.02);
+   float post=sdRoundCone(q-c, vec3(0.0,0.0,0.0), vec3(0.0,2.30,0.0), 0.055, 0.032);
+   float arm =sdRoundCone(q-c, vec3(0.0,2.26,0.0), vec3(0.0,2.34,-0.42), 0.030, 0.026);
+   float lamp=sdEllipsoid(q-c-vec3(0.0,2.26,-0.46), vec3(0.11,0.13,0.11));
+   float l=min(post,min(arm,lamp));
+   if(l<d){d=l;m= lamp<min(post,arm) ? 15.0 : 13.0;}
+  }
+ }
+ return vec2(d,m);
+}
+
+vec2 map(vec3 p){
+ vec2 f=mapFig(p);
+ vec2 e=mapEnv(p);
+ if(e.x<f.x) f=e;
+ return f;
+}
+vec3 calcN(vec3 p){
+ vec2 e=vec2(1.0,-1.0)*0.0012;
+ return normalize(e.xyy*map(p+e.xyy).x + e.yyx*map(p+e.yyx).x +
+                  e.yxy*map(p+e.yxy).x + e.xxx*map(p+e.xxx).x);
+}
+float shadow(vec3 ro, vec3 rd, float k){
+ float res=1.0,t=0.045;
+ for(int i=0;i<40;i++){
+  float h=map(ro+rd*t).x;
+  res=min(res,k*h/t); if(res<0.003||t>3.0)break;
+  t+=clamp(h,0.006,0.10);
+ }
+ return clamp(res,0.0,1.0);
+}
+float ao(vec3 p, vec3 n){
+ float o=0.0,s=1.0;
+ for(int i=0;i<5;i++){ float h=0.012+0.055*float(i); o+=(h-map(p+n*h).x)*s; s*=0.72; }
+ return clamp(1.0-1.6*o,0.0,1.0);
+}
+
+/* PASS ONE writes what was MEASURED about the surface and decides nothing about how
+   it looks. Banding, line art and paper all need to see a pixel's neighbours, and a
+   fragment shader cannot. So the look is settled in pass two, which can. */
+layout(location=0) out vec4 gA;   // lit, occlusion, rim, distance
+layout(location=1) out vec4 gB;   // normal, material
+
+void main(){
+ vec2 uv=(gl_FragCoord.xy-0.5*iRes)/iRes.y;
+ vec3 hd0=J[2];
+ vec3 ta = uScene<1.5 ? mix(vec3(0.02,0.50,0.0), vec3(4.60,1.05,-0.35), uScene)
+                      : hd0+vec3(0.010,-0.004,0.0);
+ vec3 ro = uScene<1.5 ? ta+mix(vec3(0.74,0.30,-3.10), vec3(-13.20,0.50,-0.90), uScene)
+                      : ta+vec3(0.400,0.055,-0.300);
+ float foc = uScene<1.5 ? mix(2.25,2.30,uScene) : 2.55;
+ float far = uScene<1.5 ? mix(7.0,62.0,uScene) : 3.0;
+ vec3 f=normalize(ta-ro), rgt=normalize(cross(vec3(0,1,0),f)), up=cross(f,rgt);
+ vec3 rd=normalize(uv.x*rgt+uv.y*up+foc*f);
+
+ float t=0.05, near=1e9, nearT=0.0, mat=-1.0;
+ for(int i=0;i<180;i++){
+  vec3 p=ro+rd*t;
+  vec2 h=map(p);
+  if(h.x/t<near){ near=h.x/t; nearT=t; }
+  if(h.x<0.0008*max(t,1.0)){ mat=h.y; break; }   // one pixel is bigger further away
+  t+=h.x*0.92; if(t>far)break;
+ }
+ if(mat<0.0){         // a miss still carries the near-miss, and how far away it was
+  gA=vec4(nearT,0.0,0.0,near); gB=vec4(0.5,0.5,0.5,0.0); return;
+ }
+ vec3 p=ro+rd*t, n=calcN(p);
+ vec3 L =normalize(vec3(-0.34,0.60, 0.72));
+ vec3 B =normalize(vec3( 0.30,-0.80,-0.52));
+ float dif=max(dot(n,L),0.0);
+ float sh =shadow(p+n*0.012,L,11.0);
+ float occ=ao(p,n);
+ float bnc=max(dot(n,B),0.0);
+ float sky=0.5+0.5*n.y;
+ float lit=dif*mix(0.10,1.0,sh)*0.92 + bnc*0.52 + sky*0.085;
+ float rim=pow(clamp(1.0-dot(n,-rd),0.0,1.0),1.9)*pow(max(dot(n,L),0.0),0.7);
+ /* ===== R4. THE FACE =====
+    An eye is not geometry. Modelled as a ball in a socket it costs every ray every
+    step and still reads wrong, because what makes a drawn face is the LINE -- the
+    weight of the upper lid, the brow, the corner of the mouth. So the face is a
+    decal, evaluated once at the hit, in a frame taken from the surface normal so it
+    wraps around the skull instead of being projected flat onto it. */
+ if(mat>2.5&&mat<3.5){
+  vec3 hn=normalize((p-J[2])/vec3(0.053,0.059,0.050));
+  if(hn.x>0.16){
+   vec2 f=vec2(hn.z,hn.y)/hn.x;            // gnomonic: the face plane, seen from inside
+   f.y-=0.015;
+   vec2 e=vec2(abs(f.x)-0.275, f.y-0.060);
+   float eye =length(e/vec2(0.235,0.170))-1.0;
+   float iris=length((e-vec2(0.018,-0.012))/vec2(0.118,0.140))-1.0;
+   float pup =length((e-vec2(0.018,-0.012))/vec2(0.052,0.062))-1.0;
+   float lid =length((e-vec2(0.0,0.128))/vec2(0.262,0.152))-1.0;   // the heavy upper line
+   /* mirrored about the centre line, a brow wide enough to sit over the eye also
+      reaches across the nose and meets its own reflection -- one black bar instead
+      of two brows. It has to be held off the centre. */
+   float brow=length((e-vec2(-0.022,0.400))/vec2(0.200,0.044))-1.0;
+   if(abs(f.x)<0.105) brow=1.0;
+   float mth =length((f-vec2(0.010,-0.285))/vec2(0.105,0.026))-1.0;
+   float nse =length((f-vec2(0.060,-0.135))/vec2(0.034,0.090))-1.0;
+   /* the catchlight. One bright dot is the difference between an eye and a bead --
+      it is the only thing in the drawing that says the eye is wet. */
+   float cat =length((e-vec2(-0.072,0.062))/vec2(0.044,0.050))-1.0;
+   if(eye<0.0)  mat=16.0;
+   if(iris<0.0) mat=17.0;
+   if(pup<0.0)  mat=18.0;
+   if(lid<0.0&&eye>-0.20) mat=18.0;        // the lash sits ON the eye's upper edge
+   if(brow<0.0) mat=18.0;
+   if(mth<0.0)  mat=18.0;
+   if(nse<0.0&&f.y<-0.075) mat=19.0;       // one soft line for the nose, no more
+   if(cat<0.0&&eye<0.0) mat=20.0;
+  }
+ }
+
+ /* windows are a decision made ONCE, at the hit, from the point itself -- carving
+    them into the field would cost every step of every ray for the same picture */
+ if(mat>10.5&&mat<11.5){
+  vec3 q=p-vec3(iDist,0.0,0.0);
+  /* which pair of axes the grid runs in depends on WHICH FACE we hit: use the same
+     pair on every face and the windows smear into bands down the sides. */
+  vec3 an=abs(n);
+  vec2 gq=(an.z>an.x? vec2(q.x,q.y) : vec2(q.z,q.y))*2.35;
+  vec2 fr=fract(gq);
+  if(fr.x>0.22&&fr.x<0.78&&fr.y>0.26&&fr.y<0.74&&q.y>0.55)
+   mat = h11(floor(gq.x)*13.0+floor(gq.y)*7.0)>0.52 ? 15.0 : 12.0;
+ }
+ gA=vec4(lit,occ,rim,t);
+ gB=vec4(n*0.5+0.5, mat/32.0);
+}
+</script>
+<script id="fs-comp" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+out vec4 O;
+uniform vec2 iRes;
+uniform float iTime;
+uniform sampler2D gA;      // lit, occlusion, rim, distance
+uniform sampler2D gB;      // normal, material
+uniform vec3 RAMP[21];     // seven materials, three tones each
+uniform float uLines;      // so the line pass can be turned off and compared
+uniform float uDebug;      // 1: material id  2: line strength -- so the audit has ground truth
+uniform float uScene;      // 0 the empty field, 1 the street, 2 the close-up
+uniform vec3  uHead;       // where the head is, so the close-up can look at it
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){
+ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+ return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+            mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+}
+const vec3 SKY=vec3(0.895,0.912,0.930);
+const vec3 INK=vec3(0.055,0.060,0.078);
+
+void main(){
+ ivec2 ip=ivec2(gl_FragCoord.xy);
+ ivec2 hi=ivec2(iRes)-1;
+ vec4 A=texelFetch(gA,ip,0), B=texelFetch(gB,ip,0);
+ float mat=B.a*32.0, t=A.a;
+ vec3 n=B.rgb*2.0-1.0;
+ vec2 uv=(gl_FragCoord.xy-0.5*iRes)/iRes.y;
+ vec2 sp=gl_FragCoord.xy/iRes.y;
+ float px=1.0/iRes.y;
+
+ /* ===== R2. INTERIOR LINE ART =====
+    A drawn line is not an outline. It appears wherever the eye would lose one form
+    in another: a depth step (the arm passes in front of the chest), a hard crease
+    (the boot meets the shin), or a change of material (coat against leg). All three
+    need the neighbouring pixel, which is the whole reason for this second pass.
+    Silhouette is left alone here -- the ray's near-miss already drew it. */
+ /* The camera again, because a depth step has to be judged against the slope of the
+    surface it sits on. A plane seen nearly edge-on changes depth fast from one pixel
+    to the next -- that is geometry, not an edge -- so a fixed threshold paints a soft
+    dark band down every grazing surface and quietly flattens the whole interior. */
+ vec3 ta = uScene<1.5 ? mix(vec3(0.02,0.50,0.0),vec3(4.60,1.05,-0.35),uScene) : uHead+vec3(0.010,-0.004,0.0);
+ vec3 ro = uScene<1.5 ? ta+mix(vec3(0.74,0.30,-3.10),vec3(-13.20,0.50,-0.90),uScene) : ta+vec3(0.400,0.055,-0.300);
+ vec3 fw=normalize(ta-ro), rgt=normalize(cross(vec3(0,1,0),fw)), upv=cross(fw,rgt);
+ vec3 rd=normalize(uv.x*rgt+uv.y*upv+(uScene<1.5?mix(2.25,2.30,uScene):2.55)*fw);
+ float face=max(abs(dot(n,rd)),0.12);             // 1 = flat on, 0 = edge on
+ float dTol=0.0075/face;                          // what this surface may legitimately do
+
+ float dEdge=0.0, nEdge=0.0, mEdge=0.0, curv=0.0;
+ const ivec2 OFF[4]=ivec2[4](ivec2(1,0),ivec2(-1,0),ivec2(0,1),ivec2(0,-1));
+ for(int k=0;k<4;k++){
+  ivec2 q=clamp(ip+OFF[k],ivec2(0),hi);
+  vec4 a2=texelFetch(gA,q,0), b2=texelFetch(gB,q,0);
+  float m2=b2.a*32.0;   // the SAME divisor as the centre pixel, or every pixel is an edge
+  vec3 n2=b2.rgb*2.0-1.0;
+  float nd=1.0-dot(n2,n);
+  curv+=nd*0.25;
+  if(mat>0.5&&m2>0.5){
+   /* THE LINE BELONGS TO THE FORM IN FRONT. Drawn on both sides of a boundary it is
+      a two-pixel band that covers the value step it was meant to describe -- it
+      darkens the join instead of separating it. Drawn only on the nearer surface it
+      is half as wide, and the far side keeps its own tone, which is the difference
+      between ink on a drawing and a smudge over one. */
+   bool front = t <= a2.a;
+   if(front){
+    dEdge=max(dEdge, (abs(a2.a-t)/max(t,0.001))/dTol);   // in units of what is allowed
+    if(abs(m2-mat)>0.5 && mat<9.5 && m2<9.5) mEdge=1.0;
+   }
+   nEdge=max(nEdge, nd);
+  }
+ }
+ /* and keep it crisp. A half-strength line spread over a wide band is not a line,
+    it is a smudge -- it darkens without separating, which is the opposite of the job. */
+ float line=uLines*max(smoothstep(1.35,2.20,dEdge),
+            max(smoothstep(0.40,0.62,nEdge), mEdge));
+ line=line*line*(3.0-2.0*line);
+
+ vec3 col;
+ if(mat<0.5){
+  float h=clamp(uv.y*1.4+0.5,0.0,1.0);
+  col=mix(SKY*0.985,SKY*1.01,h);
+ }else{
+  float lit=A.r, occ=A.g, rim=A.b;
+
+  /* ===== R1. THE PAINTED TERMINATOR =====
+     Where light turns to shadow is where a painting stops looking like a render.
+     Two things make that edge read as a brush and not as a threshold: it breaks
+     MORE where the form turns fast (a fold) and stays clean where the form is
+     flat, and the break streaks ALONG the form rather than across it. Curvature
+     comes free from the neighbours above; the streak comes from sampling the
+     noise in a frame built out of the surface normal itself. */
+  vec2 d2=normalize(n.xy+vec2(1e-4));
+  vec2 tg=vec2(-d2.y,d2.x);
+  /* The stretch is the whole trick. Sampled isotropically the break comes out as
+     blotches -- dirt, not brushwork. Stretched hard ALONG the form and left fine
+     ACROSS it, the same noise becomes strokes that follow the surface. */
+  vec2 bq=vec2(dot(sp,tg), dot(sp,d2)*13.0);
+  float brush=(vnoise(bq*85.0)-0.5)*0.70
+             +(vnoise(bq*240.0)-0.5)*0.34;
+  float amp=mix(0.008,0.054,clamp(curv*2.6,0.0,1.0));
+  float q=lit+brush*amp;
+
+  int mi=int(mat+0.5);
+  /* drawn marks are drawn: they do not take a light band, or the lash disappears
+     wherever the light happens to fall on it */
+  bool drawnMark = (mi>=16&&mi<=20);
+  float band = drawnMark ? (lit>0.30?2.0:1.0)
+             : smoothstep(0.208,0.228,q)+smoothstep(0.455,0.475,q);
+  vec3 c0,c1,c2;
+  if(mi==10){ c0=vec3(0.495,0.560,0.690); c1=vec3(0.735,0.780,0.860); c2=vec3(0.970,0.975,0.985); }   // snow
+  else if(mi==14){ c0=vec3(0.330,0.372,0.452); c1=vec3(0.470,0.510,0.580); c2=vec3(0.610,0.648,0.706); } // road
+  else if(mi==11){ c0=vec3(0.212,0.220,0.248); c1=vec3(0.330,0.342,0.376); c2=vec3(0.468,0.482,0.516); } // wall
+  else if(mi==12){ c0=vec3(0.086,0.094,0.116); c1=vec3(0.128,0.138,0.164); c2=vec3(0.180,0.192,0.220); } // dark window
+  else if(mi==13){ c0=vec3(0.094,0.100,0.118); c1=vec3(0.168,0.178,0.202); c2=vec3(0.262,0.274,0.302); } // metal
+  else if(mi==15){ c0=vec3(0.780,0.660,0.420); c1=vec3(0.880,0.780,0.540); c2=vec3(0.960,0.890,0.680); } // a light that is on
+  else if(mi==16){ c0=vec3(0.560,0.556,0.570); c1=vec3(0.790,0.792,0.806); c2=vec3(0.935,0.940,0.950); } // the white of an eye
+  else if(mi==17){ c0=vec3(0.075,0.098,0.122); c1=vec3(0.140,0.180,0.215); c2=vec3(0.235,0.300,0.350); } // iris
+  else if(mi==18){ c0=vec3(0.050,0.048,0.058); c1=vec3(0.072,0.070,0.082); c2=vec3(0.100,0.098,0.112); } // the drawn line
+  else if(mi==19){ c0=vec3(0.170,0.132,0.116); c1=vec3(0.285,0.228,0.202); c2=vec3(0.420,0.348,0.312); } // the shadow that is a nose
+  else if(mi==20){ c0=vec3(0.930,0.940,0.955); c1=vec3(0.965,0.970,0.980); c2=vec3(1.000,1.000,1.000); } // the catchlight
+  else { int b=(mi-1)*3; c0=RAMP[b]; c1=RAMP[b+1]; c2=RAMP[b+2]; }
+  vec3 base = band<0.5 ? c0 : (band<1.5 ? c1 : c2);
+
+  if(mi==15){ base=c2; }          // a lamp is not lit by the sun; it IS the light
+  /* A FACE INSIDE A HOOD IS STILL A FACE. Occlusion is real -- the hood does shade
+     it -- but crushed to a fortieth of its tone it stops being skin and becomes a
+     hole. Snow throws a great deal of light back up into exactly this cavity. */
+  bool faceish = (mi==3)||drawnMark;
+  base *= mi==15 ? 1.0 : (faceish ? mix(0.94,1.0,occ) : mix(0.88,1.0,occ));
+  if(mi==3) base += vec3(0.085,0.070,0.062)*(0.35+0.65*occ);   // snow bounce, into the hood
+  base += (0.5+0.5*n.y)*0.045*vec3(0.74,0.82,1.0);
+  base += rim*vec3(1.0,0.980,0.94)*2.10;
+  if(mi!=15) base *= faceish ? mix(0.80,1.0,smoothstep(0.12,0.42,occ))
+                             : mix(0.42,1.0,smoothstep(0.30,0.46,occ));
+  col=base;
+  /* aerial perspective: in a whiteout the far end of a street is the sky */
+  float fog=1.0-exp(-mix(0.0045,0.0016,uScene)*t*t);
+  col=mix(col,SKY,fog);
+
+  /* the line is drawn last and takes the ground's own darkness with it, so it reads
+     as ink on that surface rather than a black wire laid over the picture */
+  col=mix(col, min(col*0.26,INK), line*0.88);
+ }
+
+ /* the contour: a ray that came close and missed was grazing the silhouette */
+ if(mat<0.5){
+  /* a contour drawn at full strength on something forty units away is a black line
+     hanging in fog that already swallowed the building it belongs to */
+  float lineS=1.0-smoothstep(0.0004,0.0022,A.a);
+  float nfog=1.0-exp(-mix(0.0045,0.0016,uScene)*A.r*A.r);
+  col=mix(col,INK,lineS*0.95*(1.0-nfog));
+ }
+
+ /* THE AIR: near flakes streak long and pale, far ones barely move. */
+ for(int L2=0;L2<3;L2++){
+  float fl=float(L2);
+  float sc=mix(26.0,78.0,fl/2.0);
+  vec2 dir=normalize(vec2(-0.80,-1.0));
+  vec2 q2=sp*sc + dir*iTime*mix(9.0,26.0,fl/2.0)*-1.0;
+  vec2 ci=floor(q2), cf=fract(q2);
+  if(hash(ci+fl*37.0)>0.80){
+   vec2 c2=vec2(hash(ci+7.0),hash(ci+19.0));
+   vec2 dv=(cf-c2); dv.x*=mix(3.0,1.4,fl/2.0);
+   float fa=smoothstep(mix(0.16,0.07,fl/2.0),0.0,length(dv))*mix(0.22,0.80,fl/2.0);
+   col=mix(col,vec3(0.985,0.990,1.0),fa);
+  }
+ }
+ if(uDebug>0.5){
+  if(uDebug<1.5) O=vec4(vec3(mat/32.0),1.0);
+  else if(uDebug<2.5) O=vec4(vec3(line),1.0);
+  else O=vec4(clamp(dEdge/2.2,0.0,1.0), clamp(nEdge/0.62,0.0,1.0), mEdge, 1.0);
+  return; }
+
+ vec2 g=gl_FragCoord.xy;
+ col+=(vnoise(g*1.9)-0.5)*0.030 + (vnoise(g*0.31)-0.5)*0.022;
+ col*=1.0-0.20*pow(length(uv*vec2(0.86,1.0)),2.3);
+ col=pow(clamp(col,0.0,1.0),vec3(0.92));
+ O=vec4(col,1.0);
+}
+</script>
+<script>
+const POSES={"PW": [{"hip": -49.9, "lean": 0.155, "arch": 6.8, "sh": [1.5, -82.4], "hd": [1.2, -0.3], "nk": [12.87, -28.47], "na": [18, -4], "nf": 0.26, "fk": [-4.24, -25.26], "fa": [-16, -3.2], "ff": -0.52, "neb": [-7.04, -65.43], "nh": [-11.72, -50.86], "feb": [7.35, -64.43], "fh": [12.78, -50.12], "cl": [[-4, -79], [-9.5, -70], [-14, -60], [-17, -49]]}, {"hip": -51, "lean": 0.185, "arch": 8.2, "sh": [2.8, -83.3], "hd": [1.5, 0.2], "nk": [9.08, -27.71], "na": [5.25, -3], "nf": 0.06, "fk": [-2.3, -26.11], "fa": [-19, -7.5], "ff": -0.86, "neb": [-3.39, -65.34], "nh": [-7.66, -50.64], "feb": [6.59, -64.68], "fh": [10.27, -50.23], "cl": [[-4, -76], [-10, -67], [-15, -57], [-19, -46]]}, {"hip": -52.9, "lean": 0.135, "arch": 5.4, "sh": [1, -85], "hd": [0.8, -0.7], "nk": [-1.03, -27.92], "na": [-3.25, -3.02], "nf": -0.04, "fk": [11.87, -30.9], "fa": [-7, -14.5], "ff": -0.3, "neb": [-4.43, -66.79], "nh": [-4, -51.5], "feb": [2.75, -66.91], "fh": [4.97, -51.77], "cl": [[-4, -82], [-8, -73], [-11, -63], [-12, -52]]}, {"hip": -52.2, "lean": 0.17, "arch": 6.2, "sh": [2.2, -83.7], "hd": [1, -0.1], "nk": [-1.37, -27.24], "na": [-7.5, -3], "nf": -0.34, "fk": [18.33, -35.2], "fa": [9, -12], "ff": 0.16, "neb": [1.33, -64.72], "nh": [5.5, -50], "feb": [-2.67, -65.41], "fh": [-5.89, -50.45], "cl": [[-4, -80], [-8.5, -71], [-12, -61], [-14, -50]]}], "STAND": {"hip": -52.5, "lean": 0.045, "arch": 5.6, "sh": [1, -84.1], "hd": [0.7, -0.4], "nk": [4.97, -28], "na": [5, -3], "nf": 0.1, "fk": [-1.16, -27.53], "fa": [-6, -3], "ff": -0.14, "neb": [2.8, -65.19], "nh": [4.99, -50.04], "feb": [-1.84, -65.97], "fh": [-3.46, -50.76], "cl": [[-4, -80], [-8, -71], [-10.5, -61], [-11, -50]]}}, RAMPS=[new Float32Array([0.052, 0.058, 0.078, 0.116, 0.126, 0.156, 0.215, 0.23, 0.272, 0.036, 0.04, 0.054, 0.082, 0.089, 0.108, 0.158, 0.168, 0.194, 0.2, 0.16, 0.142, 0.345, 0.284, 0.252, 0.52, 0.44, 0.394, 0.29, 0.302, 0.33, 0.53, 0.547, 0.58, 0.82, 0.838, 0.866, 0.078, 0.086, 0.112, 0.165, 0.178, 0.214, 0.292, 0.31, 0.356, 0.04, 0.046, 0.062, 0.094, 0.103, 0.128, 0.186, 0.199, 0.234, 0, 0, 0, 0, 0, 0, 0, 0, 0]),new Float32Array([0.098, 0.107, 0.124, 0.212, 0.228, 0.255, 0.43, 0.452, 0.487, 0.04, 0.044, 0.055, 0.088, 0.094, 0.11, 0.16, 0.17, 0.19, 0.14, 0.152, 0.176, 0.3, 0.32, 0.352, 0.62, 0.646, 0.685, 0.262, 0.07, 0.048, 0.47, 0.14, 0.086, 0.72, 0.268, 0.17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])];
+function swapPose(P){return {hip:P.hip,lean:P.lean,arch:P.arch,sh:P.sh,hd:P.hd,hold:P.hold,
+ nk:P.fk,na:P.fa,nf:P.ff,fk:P.nk,fa:P.na,ff:P.nf,neb:P.feb,nh:P.fh,feb:P.neb,fh:P.nh,cl:P.cl};}
+const HOLDS=[3,2,1,2,3,2,1,2];
+const WALK=POSES.PW.concat(POSES.PW.map(swapPose));
+const SLOTS=HOLDS.reduce((a,b)=>a+b,0), CYCLE=SLOTS/12, TRAVEL=0.68;
+const CUM=(()=>{const o=[];let a=0;for(const h of HOLDS){o.push(a);a+=h*(TRAVEL/SLOTS);}return o;})();
+function idxAt(ph){ph=((ph%1)+1)%1;let d=ph*SLOTS,i=0;
+ while(d>=HOLDS[i]){d-=HOLDS[i];i++;if(i>=8){i=0;break;}}return i;}
+function travel(p){const k=Math.floor(p);return k*TRAVEL+CUM[idxAt(p-k)];}
+const NZ=-0.048,FZ=0.048;
+function joints(K){
+ const X=v=>v/100,Y=v=>-v/100;
+ const toe=(a,g)=>[X(a[0]+Math.cos(g*0.6)*10.5),Y(a[1]-Math.sin(g*0.6)*10.5)];
+ const nt=toe(K.na,K.nf),ft=toe(K.fa,K.ff),J=[];
+ const put=(x,y,z)=>J.push(x,y,z);
+ put(0,-K.hip/100,0); put(X(K.sh[0]),Y(K.sh[1]),0);
+ put(X(K.sh[0]+K.hd[0]+1.0),Y(K.sh[1]-11.0+K.hd[1]),0); put(X(K.sh[0]+0.6),Y(K.sh[1]-5.0),0);
+ put(X(K.nk[0]),Y(K.nk[1]),NZ); put(X(K.na[0]),Y(K.na[1]),NZ); put(nt[0],nt[1],NZ);
+ put(X(K.neb[0]),Y(K.neb[1]),NZ*1.5); put(X(K.nh[0]),Y(K.nh[1]),NZ*1.5);
+ put(X(K.fk[0]),Y(K.fk[1]),FZ); put(X(K.fa[0]),Y(K.fa[1]),FZ); put(ft[0],ft[1],FZ);
+ put(X(K.feb[0]),Y(K.feb[1]),FZ*1.5); put(X(K.fh[0]),Y(K.fh[1]),FZ*1.5);
+ put(X(K.cl[1][0]),Y(K.cl[1][1]),0); put(X(K.cl[3][0]-3),Y(K.cl[3][1]+10),0);
+ return new Float32Array(J);
+}
+const c=document.getElementById('c'),hud=document.getElementById('hud'),
+      s2=document.getElementById('s2'),s3=document.getElementById('s3'),s4=document.getElementById('s4');
+const gl=c.getContext('webgl2',{antialias:false,powerPreference:'high-performance'});
+const fail=(m)=>{document.querySelector('.stage').innerHTML=
+ '<p style="padding:24px;font:400 13px/1.6 var(--mono);color:var(--ink)">'+m+'</p>';};
+if(!gl) fail("Bu brauzerda WebGL2 yo'q.");
+else if(!gl.getExtension('EXT_color_buffer_float')) fail("Float bufer qo'llab-quvvatlanmaydi.");
+else{
+const VS=`#version 300 es
+void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0,1);}`;
+const mk=(t,src)=>{const o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);
+ if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;};
+const link=(fsId)=>{const p=gl.createProgram();
+ gl.attachShader(p,mk(gl.VERTEX_SHADER,VS));
+ gl.attachShader(p,mk(gl.FRAGMENT_SHADER,document.getElementById(fsId).textContent.trim()));
+ gl.linkProgram(p);
+ if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+ return p;};
+const CH=[{id:'fs-walker',name:"Qalpoqli",src:'hooded-walker'},
+          {id:'fs-guard', name:"Zirhli",  src:'plated-guard'}];
+const GEO=CH.map(ch=>{const p=link(ch.id);
+ return {p,uRes:gl.getUniformLocation(p,'iRes'),uJ:gl.getUniformLocation(p,'J'),
+         uT:gl.getUniformLocation(p,'iTime'),uD:gl.getUniformLocation(p,'iDist'),
+         uS:gl.getUniformLocation(p,'uScene'),
+         uC:gl.getUniformLocation(p,'uCell'),uN:gl.getUniformLocation(p,'uNbr')};});
+const cp=link('fs-comp');
+const CP={p:cp,uRes:gl.getUniformLocation(cp,'iRes'),uT:gl.getUniformLocation(cp,'iTime'),
+ uA:gl.getUniformLocation(cp,'gA'),uB:gl.getUniformLocation(cp,'gB'),
+ uR:gl.getUniformLocation(cp,'RAMP'),uL:gl.getUniformLocation(cp,'uLines'),
+ uDB:gl.getUniformLocation(cp,'uDebug'),uS:gl.getUniformLocation(cp,'uScene'),
+ uH:gl.getUniformLocation(cp,'uHead')};
+/* the G-buffer: pass one writes measurements here, pass two reads the neighbours */
+let fbo=null,texA,texB,fw=0,fh=0;
+function fb(w,h){
+ if(fw===w&&fh===h)return;
+ if(fbo){gl.deleteFramebuffer(fbo);gl.deleteTexture(texA);gl.deleteTexture(texB);}
+ fw=w;fh=h;
+ const tex=()=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  for(const k of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,k,gl.NEAREST);
+  for(const k of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,k,gl.CLAMP_TO_EDGE);
+  return t;};
+ texA=tex();texB=tex();
+ fbo=gl.createFramebuffer();
+ gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+ gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texA,0);
+ gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D,texB,0);
+ gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
+let QUAL=1, cur=0, lines=1, dbg=0, scene=0, cell=0, nbr=1;
+const HEAD=new Float32Array(3);
+const SCALE=[0.42,0.62,0.92];
+function size(){
+ const w=c.clientWidth||520;
+ const dpr=Math.min(window.devicePixelRatio||1,2)*SCALE[QUAL];
+ c.width=Math.max(220,Math.round(w*dpr)); c.height=Math.round(c.width*1.26);
+}
+function render(i,T,dist){
+ fb(c.width,c.height);
+ const G=GEO[cur];
+ gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+ gl.viewport(0,0,c.width,c.height);
+ gl.useProgram(G.p);
+ gl.uniform2f(G.uRes,c.width,c.height);
+ gl.uniform1f(G.uT,T); gl.uniform1f(G.uD,dist); gl.uniform1f(G.uS,scene); gl.uniform1f(G.uC,cell); gl.uniform1f(G.uN,nbr);
+ const JT=joints(WALK[i]); HEAD[0]=JT[6];HEAD[1]=JT[7];HEAD[2]=JT[8];
+ gl.uniform3fv(G.uJ,JT);
+ gl.drawArrays(gl.TRIANGLES,0,3);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+ gl.viewport(0,0,c.width,c.height);
+ gl.useProgram(CP.p);
+ gl.uniform2f(CP.uRes,c.width,c.height);
+ gl.uniform1f(CP.uT,T);
+ gl.uniform1f(CP.uL,lines); gl.uniform1f(CP.uDB,dbg); gl.uniform1f(CP.uS,scene); gl.uniform3fv(CP.uH,HEAD);
+ gl.uniform3fv(CP.uR,RAMPS[cur]);
+ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texA);gl.uniform1i(CP.uA,0);
+ gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,texB);gl.uniform1i(CP.uB,1);
+ gl.drawArrays(gl.TRIANGLES,0,3);
+}
+let ph=0,dist=0,last=performance.now(),playing=true,T=0,ft=0,halt=false;
+function frame(now){
+ if(halt)return;
+ const dt=Math.min(0.05,Math.max(0,(now-last)/1000)); last=now;
+ if(playing){const p0=ph; ph+=dt/CYCLE; T+=dt; dist+=travel(ph)-travel(p0);}
+ const i=idxAt(ph);
+ render(i,T,dist);
+ const iv=Math.max(dt*1000,0.1); ft=ft?ft*0.88+iv*0.12:iv;
+ hud.textContent='chizma '+(i+1)+'/8 · ushlash '+HOLDS[i];
+ s2.textContent='chizma '+(i+1)+' — '+c.width+'x'+c.height+' px';
+ s3.textContent=ft.toFixed(1)+' ms  ·  '+(1000/Math.max(ft,0.001)).toFixed(0)+' fps';
+ requestAnimationFrame(frame);
+}
+addEventListener('resize',size); size(); requestAnimationFrame(frame);
+const pl=document.getElementById('play');
+pl.onclick=()=>{playing=!playing;pl.textContent=playing?'Pauza':'Davom';pl.setAttribute('aria-pressed',playing);};
+[0,1,2].forEach(q=>{document.getElementById('q'+q).onclick=()=>{
+ QUAL=q;size();[0,1,2].forEach(k=>document.getElementById('q'+k).setAttribute('aria-pressed',k===q));};});
+CH.forEach((ch,k)=>{const el=document.getElementById('ch'+k);
+ el.textContent=ch.name; el.setAttribute('aria-pressed',k===0);
+ el.onclick=()=>{cur=k;CH.forEach((_,j)=>document.getElementById('ch'+j).setAttribute('aria-pressed',j===k));
+  s4.textContent=ch.name.toLowerCase()+' — characters/'+ch.src+'.json';};});
+[0,1,2].forEach(v=>{document.getElementById('sc'+v).onclick=()=>{scene=v;
+ [0,1,2].forEach(k=>document.getElementById('sc'+k).setAttribute('aria-pressed',k===v));};});
+const ln=document.getElementById('ln');
+ln.onclick=()=>{lines=lines?0:1;ln.textContent=lines?'bor':"yo'q";ln.setAttribute('aria-pressed',!!lines);};
+window.__character=(k)=>{cur=k;};
+window.__lines=(v)=>{lines=v;};
+window.__debug=(v)=>{dbg=v;};
+window.__scene=(v)=>{scene=v;};
+window.__cell=(v)=>{cell=v;};
+window.__nbr=(v)=>{nbr=v;};
+window.__still=(i,w,h)=>{halt=true;c.width=w;c.height=h;playing=false;
+ ph=(function(){let a=0;for(let k=0;k<i;k++)a+=HOLDS[k];return a/SLOTS+0.001;})();
+ dist=travel(ph); render(i,i*0.41,dist); gl.finish();};
+}
+</script>

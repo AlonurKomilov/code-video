@@ -1,15 +1,15 @@
 {
  "nom": "Oq Ko'cha",
  "manba": [
-  "../../qalam-repo/src/geo.frag",
-  "../../qalam-repo/src/comp.frag",
-  "../../qalam-repo/src/sheet.mjs",
-  "../../qalam-repo/src/shots.mjs",
-  "../../qalam-repo/src/poses.json",
-  "../../qalam-repo/src/characters/hooded-walker.json"
+  "../../oq-kocha/src/geo.frag",
+  "../../oq-kocha/src/comp.frag",
+  "../../oq-kocha/src/sheet.mjs",
+  "../../oq-kocha/src/shots.mjs",
+  "../../oq-kocha/src/poses.json",
+  "../../oq-kocha/src/characters/hooded-walker.json"
  ],
  "kadr": {
-  "fayl": "../../qalam-repo/build/oq-kocha.html",
+  "fayl": "../../oq-kocha/build/oq-kocha.html",
   "kadrlar": [
    36,
    300,

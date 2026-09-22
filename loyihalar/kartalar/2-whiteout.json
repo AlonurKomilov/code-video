@@ -1,10 +1,10 @@
 {
  "nom": "Whiteout",
  "manba": [
-  "../../whiteout2.html"
+  "../../whiteout/whiteout.html"
  ],
  "kadr": {
-  "fayl": "../../whiteout2.html",
+  "fayl": "../../whiteout/whiteout.html",
   "kadrlar": [
    4,
    10,
