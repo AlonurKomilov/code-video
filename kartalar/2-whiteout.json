@@ -1,0 +1,142 @@
+{
+ "nom": "Whiteout",
+ "manba": [
+  "../../whiteout2.html"
+ ],
+ "kadr": {
+  "fayl": "../../whiteout2.html",
+  "kadrlar": [
+   4,
+   10,
+   16
+  ]
+ },
+ "uslub": [
+  {
+   "gap": "Qo'lda yozilgan 4 poza — CONTACT, DOWN, PASSING, UP — ko'zguda 8 taga aylanadi.",
+   "dalil": "jadvallar.PW"
+  },
+  {
+   "gap": "13 kadr, eng qisqasi 0,085 s — zarb uchun.",
+   "dalil": "jadvallar.SHOTS"
+  },
+  {
+   "gap": "Har kadrda 127 chizish buyrug'i ishlaydi: 35 beginPath, 33 lineTo, 13 bezierCurveTo.",
+   "dalil": "chizishJami"
+  },
+  {
+   "gap": "renderer canvas2d, 1094 satr, 39 funksiya.",
+   "dalil": "satrlar"
+  }
+ ],
+ "stil": "Chegarasiz qor dalasi. Ufq yo'q, bino yo'q, soya yo'q — oq maydon va undagi bitta nuqta. Sarlavha Cormorant Garamond bilan, o'lchov satrlari IBM Plex Mono bilan.",
+ "davolar": {
+  "qiymat.past": [
+   ">",
+   150,
+   "eng qorong'i piksel ham yorug' — bu film OQ"
+  ],
+  "toyinganlik": [
+   "<",
+   6,
+   "va rangsiz"
+  ]
+ },
+ "sanoq": {
+  "fayllar": 1,
+  "baytlar": 49587,
+  "satrlar": 1094,
+  "renderer": "canvas2d",
+  "funksiyalar": 39,
+  "ovoz": true,
+  "hodisalar": [
+   "click"
+  ],
+  "shriftlar": [
+   "Cormorant Garamond",
+   "IBM Plex Mono"
+  ],
+  "chizish": {
+   "beginPath": 35,
+   "moveTo": 19,
+   "lineTo": 33,
+   "arc": 7,
+   "bezierCurveTo": 13,
+   "quadraticCurveTo": 4,
+   "ellipse": 8,
+   "fillRect": 4,
+   "fillText": 2,
+   "createLinearGradient": 2
+  },
+  "chizishJami": 127,
+  "jadvallar": {
+   "PW": 4,
+   "SHOTS": 13
+  },
+  "davomiyliklar": [
+   3,
+   2,
+   1.8,
+   1.6,
+   0.6,
+   0.42,
+   0.17,
+   0.125,
+   0.085,
+   1.15,
+   2,
+   2.4,
+   4
+  ]
+ },
+ "olchov": {
+  "palitra": [
+   {
+    "hex": "#e8ecec",
+    "ulush": 50
+   },
+   {
+    "hex": "#dee2e3",
+    "ulush": 25
+   },
+   {
+    "hex": "#d3d8d9",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#c7cdce",
+    "ulush": 6.3
+   },
+   {
+    "hex": "#84898b",
+    "ulush": 3.1
+   },
+   {
+    "hex": "#c1c8c9",
+    "ulush": 3.1
+   }
+  ],
+  "qiymat": [
+   193,
+   243
+  ],
+  "toyinganlik": 2.1,
+  "qattiqChet": 0.67,
+  "yumshoqChet": 8.96,
+  "chizilganlik": 7,
+  "tekstura": 1.18,
+  "siyoh": 0
+ },
+ "maqsadlar": {
+  "qiymat.oraliq": [
+   ">",
+   90,
+   "hozir 50 — oq ustiga oq, o'lchaydigan qorong'i narsa yo'q"
+  ],
+  "chizilganlik": [
+   ">",
+   8,
+   "hozir 7 — chizilgan chet deyarli yo'q"
+  ]
+ }
+}

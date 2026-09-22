@@ -1,0 +1,120 @@
+{
+ "nom": "Yomg'irli derazadagi mushuk",
+ "manba": [
+  "../../rainy-cat.html"
+ ],
+ "kadr": {
+  "fayl": "../../rainy-cat.html",
+  "kadrlar": [
+   4,
+   9,
+   14
+  ]
+ },
+ "uslub": [
+  {
+   "gap": "Mushuk uchta yo'l bilan chiziladi — catBodyPath, catHeadPath, tailPath — shahar esa halftoneGlow bilan. Jami 26 funksiya.",
+   "dalil": "funksiyalar"
+  },
+  {
+   "gap": "Har kadrda 82 chizish buyrug'i — beshtasining ichida eng soddasi.",
+   "dalil": "chizishJami"
+  },
+  {
+   "gap": "Bosilganda javob beradi: click — mushuk javob beradi, chaqmoq uradi, tomchi uziladi.",
+   "dalil": "hodisalar"
+  },
+  {
+   "gap": "renderer canvas2d, 530 satr; sahna offscreen buferga chiziladi, keyin birlashtiriladi.",
+   "dalil": "satrlar"
+  }
+ ],
+ "stil": "Yomg'irli tungi deraza. Issiq parda chapda, halftone nuqtali shahar o'ngda, siluetda mushuk. Beshtasining ichida eng rangdori; yorug'lik hech qachon oqqa yetmaydi.",
+ "davolar": {
+  "toyinganlik": [
+   ">",
+   55,
+   "bu filmning o'zi rang"
+  ],
+  "siyoh": [
+   ">",
+   8,
+   "siluet bilan ishlaydi"
+  ]
+ },
+ "sanoq": {
+  "fayllar": 1,
+  "baytlar": 26481,
+  "satrlar": 530,
+  "renderer": "canvas2d",
+  "funksiyalar": 26,
+  "ovoz": true,
+  "hodisalar": [
+   "click",
+   "input",
+   "visibilitychange"
+  ],
+  "shriftlar": [],
+  "chizish": {
+   "beginPath": 17,
+   "moveTo": 12,
+   "lineTo": 14,
+   "arc": 8,
+   "bezierCurveTo": 7,
+   "ellipse": 2,
+   "rect": 2,
+   "fillRect": 14,
+   "drawImage": 3,
+   "createLinearGradient": 1,
+   "createRadialGradient": 1,
+   "clip": 1
+  },
+  "chizishJami": 82,
+  "jadvallar": {}
+ },
+ "olchov": {
+  "palitra": [
+   {
+    "hex": "#3e264d",
+    "ulush": 50
+   },
+   {
+    "hex": "#8d502b",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#c06838",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#3648ac",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#414fb5",
+    "ulush": 6.3
+   },
+   {
+    "hex": "#726cb7",
+    "ulush": 6.3
+   }
+  ],
+  "qiymat": [
+   12,
+   151
+  ],
+  "toyinganlik": 68.1,
+  "qattiqChet": 5.69,
+  "yumshoqChet": 35.53,
+  "chizilganlik": 13.8,
+  "tekstura": 5.77,
+  "siyoh": 13.6
+ },
+ "maqsadlar": {
+  "qiymat.oraliq": [
+   ">",
+   190,
+   "hozir 139 — yorug'ligi 151 da to'xtaydi"
+  ]
+ }
+}

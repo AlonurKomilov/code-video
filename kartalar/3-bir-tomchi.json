@@ -1,0 +1,132 @@
+{
+ "nom": "Bir tomchi sayohati",
+ "manba": [
+  "../../journey.html"
+ ],
+ "kadr": {
+  "fayl": "../../journey.html",
+  "kadrlar": [
+   7,
+   16,
+   25
+  ]
+ },
+ "uslub": [
+  {
+   "gap": "8 sahna, har biri 9 soniya, 1,35 soniya bir-birining ustiga tushadi — Deraza, Tomchi ichida, Kit, Vulqon, Cho'l, Kolibri, Shahar, Plastinka.",
+   "dalil": "jadvallar.SC"
+  },
+  {
+   "gap": "Har kadrda 379 chizish buyrug'i — beshtasining ichida eng zichi.",
+   "dalil": "chizishJami"
+  },
+  {
+   "gap": "98 beginPath, 68 lineTo, 43 arc, 30 bezierCurveTo: shakllar qo'lda yoziladi, tasvir emas.",
+   "dalil": "chizish.beginPath"
+  },
+  {
+   "gap": "Har sahna o'z draw(t,p) funksiyasi, kamera kalit kadrlari va ovoz to'shagiga ega — 29 funksiya.",
+   "dalil": "funksiyalar"
+  }
+ ],
+ "stil": "Yomg'irli kechqurun, tomchining ichidan. Neon chekka, radial yog'du, shaffof pufakchalar. Kamera sahnadan sahnaga kalit kadrlar bo'ylab uchadi, sahnalar bir-birining ustiga qo'yiladi.",
+ "davolar": {
+  "toyinganlik": [
+   ">",
+   45,
+   "tunning rangi"
+  ],
+  "siyoh": [
+   ">",
+   8,
+   "qorong'u — bu tungi film"
+  ]
+ },
+ "sanoq": {
+  "fayllar": 1,
+  "baytlar": 68531,
+  "satrlar": 1146,
+  "renderer": "canvas2d",
+  "funksiyalar": 29,
+  "ovoz": true,
+  "hodisalar": [
+   "click",
+   "visibilitychange"
+  ],
+  "shriftlar": [],
+  "chizish": {
+   "beginPath": 98,
+   "moveTo": 51,
+   "lineTo": 68,
+   "arc": 43,
+   "bezierCurveTo": 30,
+   "quadraticCurveTo": 6,
+   "ellipse": 22,
+   "rect": 4,
+   "fillRect": 37,
+   "drawImage": 4,
+   "createLinearGradient": 1,
+   "createRadialGradient": 9,
+   "clip": 6
+  },
+  "chizishJami": 379,
+  "jadvallar": {
+   "SC": 8
+  },
+  "davomiyliklar": [
+   9,
+   9,
+   9,
+   9,
+   9,
+   9,
+   9,
+   9
+  ]
+ },
+ "olchov": {
+  "palitra": [
+   {
+    "hex": "#1f1d46",
+    "ulush": 25
+   },
+   {
+    "hex": "#3b4aad",
+    "ulush": 25
+   },
+   {
+    "hex": "#853a3e",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#a86549",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#94439b",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#877da7",
+    "ulush": 12.5
+   }
+  ],
+  "qiymat": [
+   12,
+   156
+  ],
+  "toyinganlik": 57.5,
+  "qattiqChet": 3.69,
+  "yumshoqChet": 32.64,
+  "chizilganlik": 10.2,
+  "tekstura": 4.71,
+  "siyoh": 14
+ },
+ "maqsadlar": {
+  "chizilganlik": [
+   ">",
+   14,
+   "hozir 10,2 — yog'du chetlarni eritadi"
+  ]
+ }
+}
