@@ -24,6 +24,7 @@ holatga qarshi isbotlaydi; isbotlay olmasa `UNPROVEN` bo'ladi va qurish to'xtayd
 | `mushuk/` | Mushuk uchta yo'l bilan, shahar halftone bilan; bosilganda javob beradi | karta |
 | `not-a-measurement/` | 8 kesim, butun film 39 chizish buyrug'ida | karta |
 | `masofa-maydoni/` | SDF qumloq — primitivlar, birlashmalar, marching | — |
+| `skills/` | Shu ishlar qaysi ko'rsatmalar ostida qilinganining qaydi | — |
 
 ## Nega bu tadqiqot
 
