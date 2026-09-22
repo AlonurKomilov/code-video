@@ -6,6 +6,9 @@ def mod(p):
     return re.sub(r'^export (const|function) ',r'\1 ',t,flags=re.M)
 G=open(os.path.join(ROOT,'build','film.frag'),encoding='utf-8').read()
 C=open(os.path.join(ROOT,'src','comp.frag'),encoding='utf-8').read()
+SDECL=open(os.path.join(ROOT,'build','style.glsl'),encoding='utf-8').read()
+SJS=open(os.path.join(ROOT,'build','style.js'),encoding='utf-8').read()
+G=G.replace('__STYLEDECL__',SDECL); C=C.replace('__STYLEDECL__',SDECL)
 R=json.load(open(os.path.join(ROOT,'build','film.ramp.json')))
 P=json.load(open(os.path.join(ROOT,'src','poses.json')))
 flat=[v for c in R for v in c]
@@ -56,6 +59,8 @@ HEAD=r'''<title>Oq Ko'cha</title>
   <span>sifat</span>
   <button id="qa" aria-pressed="true">avto</button><button id="q0">past</button><button id="q1">o'rta</button><button id="q2">to'liq</button>
   <span id="q">—</span>
+  <span>uslub</span>
+  <span id="styles"></span>
  </div>
  <dl>
   <dt>Kadr</dt><dd id="s1">—</dd>
@@ -193,7 +198,9 @@ function scheduleLoop(base){
  }
 }
 /* every knob the audit needs to break the picture on purpose, in one place */
-const OPT={lines:1,nbr:1,cell:0,cam:null,bound:1,fog:1,snow:1,lfar:1,rimg:1,wmax:4096,wdir:1};
+__STYLEJS__
+const GS=styleLocs(gl,gp), KS=styleLocs(gl,cp);
+const OPT={lines:1,nbr:1,cell:0,cam:null,bound:1,fog:1,snow:1,lfar:1,rimg:1,wmax:4096,wdir:1,style:'oq-qalam'};
 function shotAt(t){let i=0;for(let j=0;j<SHOTS.length;j++)if(t>=S[j])i=j;return i;}
 
 /* ===== THE SOUND TIMELINE =====
@@ -235,6 +242,9 @@ function render(){
  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
  gl.viewport(0,0,c.width,c.height);
  gl.useProgram(G.p);
+ /* THE STYLE IS SET ON BOTH PROGRAMS EVERY FRAME. It is forty numbers; the picture
+    is two million pixels. */
+ styleApply(gl,GS,STYLES[OPT.style]);
  gl.uniform2f(G.res,c.width,c.height);
  gl.uniform1f(G.t,T); gl.uniform1f(G.d,dist); gl.uniform1f(G.sc,sh.sc);
  gl.uniform1f(G.two,sh.two); gl.uniform1f(G.cell,OPT.cell); gl.uniform1f(G.nbr,OPT.nbr);
@@ -249,6 +259,7 @@ function render(){
  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
  gl.viewport(0,0,c.width,c.height);
  gl.useProgram(K.p);
+ styleApply(gl,KS,STYLES[OPT.style]);
  gl.uniform2f(K.res,c.width,c.height); gl.uniform1f(K.t,T); gl.uniform1f(K.sc,sh.sc);
  gl.uniform1f(K.lines,OPT.lines); gl.uniform1f(K.dbg,DBG); gl.uniform1f(K.fog,OPT.fog); gl.uniform1f(K.snow,OPT.snow); gl.uniform1f(K.lfar,OPT.lfar); gl.uniform1f(K.rimo,OPT.rimg); gl.uniform1f(K.wmax,OPT.wmax);
  gl.uniform3fv(K.ramp,RAMP);
@@ -325,6 +336,19 @@ sb.onclick=()=>{
 /* deterministic access, for the audit */
 window.__total=TOTAL; window.__fps=FPS; window.__shots=SHOTS.map(s=>({k:s.k,d:s.d,sz:s.sz}));
 window.__shotsRaw=SHOTS;   // the audit needs to perturb a camera to price it
+window.__styles=()=>Object.keys(STYLES).map(k=>({name:k,title:STYLES[k].t}));
+/* THE SAME FILM, THE OTHER WAY OF DRAWING IT. Nothing below the marks changes: same
+   drawings on the same exposure sheet through the same cameras. */
+{const box=document.getElementById('styles');
+ for(const k of Object.keys(STYLES)){
+  const b=document.createElement('button');
+  b.textContent=STYLES[k].t; b.dataset.k=k;
+  b.setAttribute('aria-pressed', k===OPT.style?'true':'false');
+  b.onclick=()=>{ OPT.style=k;
+   for(const o of box.children) o.setAttribute('aria-pressed', o.dataset.k===k?'true':'false');
+   if(!playing) render(); };
+  box.appendChild(b);
+ }}
 window.__timeline=()=>TIMELINE;
 /* the same graph, rendered offline, so the sound can be MEASURED rather than liked */
 window.__renderAudio=async(seconds,sr)=>{
@@ -359,7 +383,7 @@ window.__primFrame=(n,w,h)=>{DBG=5;const r=window.__frameTo(n,w,h);DBG=0;return 
 window.__depthFrame=(n,w,h)=>{DBG=6;const r=window.__frameTo(n,w,h);DBG=0;return r;};
 window.__dbgFrame=(d,n,w,h)=>{DBG=d;const r=window.__frameTo(n,w,h);DBG=0;return r;};
 window.__opt=(o)=>{Object.assign(OPT,o);};
-window.__resetOpt=()=>{OPT.lines=1;OPT.nbr=1;OPT.cell=0;OPT.cam=null;OPT.bound=1;OPT.fog=1;OPT.snow=1;OPT.lfar=1;OPT.rimg=1;OPT.wmax=4096;OPT.wdir=1;};
+window.__resetOpt=()=>{OPT.lines=1;OPT.nbr=1;OPT.cell=0;OPT.cam=null;OPT.bound=1;OPT.fog=1;OPT.snow=1;OPT.lfar=1;OPT.rimg=1;OPT.wmax=4096;OPT.wdir=1;OPT.style='oq-qalam';};
 window.__frameTo=(n,w,h)=>{
  playing=false; T=0;phA=0;phB=0.37;dist=0;acc=0;
  if(w){c.width=w;c.height=h;}
@@ -379,6 +403,7 @@ window.__frameTo=(n,w,h)=>{
 HEAD=HEAD.replace('__SHEET__', mod('sheet.mjs') + '\nconst WALK=walkFrom(POSES.PW);')
 HEAD=HEAD.replace('__SHOTS__', mod('shots.mjs'))
 HEAD=HEAD.replace('__SOUND__', mod('sound.mjs'))
+HEAD=HEAD.replace('__STYLEJS__',SJS)
 out=(HEAD.replace('__G__',G).replace('__C__',C)
    .replace('__POSES__',json.dumps(P)).replace('__RAMP__',json.dumps(flat)))
 os.makedirs(os.path.join(ROOT,'build'),exist_ok=True)

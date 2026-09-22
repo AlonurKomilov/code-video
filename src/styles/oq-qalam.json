@@ -1,0 +1,385 @@
+{
+ "name": "oq-qalam",
+ "title": "Oq qalam",
+ "note": "Brush and paper. The light edge is broken by a stroke that follows the form, the whole frame sits on paper grain, ink thins into the weather, and the air is thick enough to swallow the end of a street. Quiet values, a narrow range, almost no colour.",
+ "p": {
+  "Band": [
+   0.208,
+   0.228,
+   0.455,
+   0.475
+  ],
+  "DrawnLit": [
+   0.3
+  ],
+  "Ink": [
+   0.055,
+   0.06,
+   0.078
+  ],
+  "InkStrength": [
+   0.88
+  ],
+  "InkFloor": [
+   0.26
+  ],
+  "Contour": [
+   0.95
+  ],
+  "InkFade": [
+   0.9
+  ],
+  "InkDepthTol": [
+   0.0075
+  ],
+  "InkDepthEdge": [
+   1.35,
+   2.2
+  ],
+  "InkNormalEdge": [
+   0.4,
+   0.62
+  ],
+  "BrushStretch": [
+   13.0
+  ],
+  "BrushOct": [
+   85.0,
+   0.7,
+   240.0,
+   0.34
+  ],
+  "BrushAmp": [
+   0.008,
+   0.054
+  ],
+  "BrushCurv": [
+   2.6
+  ],
+  "Rim": [
+   1.05,
+   0.5
+  ],
+  "Occ": [
+   0.88,
+   0.42,
+   0.3,
+   0.46
+  ],
+  "OccFace": [
+   0.94,
+   0.8,
+   0.12,
+   0.42
+  ],
+  "Sky": [
+   0.895,
+   0.912,
+   0.93
+  ],
+  "SkyGrad": [
+   0.985,
+   1.01
+  ],
+  "Fog": [
+   0.0105,
+   0.0016
+  ],
+  "SkyFill": [
+   0.045
+  ],
+  "SkyFillCol": [
+   0.74,
+   0.82,
+   1.0
+  ],
+  "HoodBounce": [
+   0.085,
+   0.07,
+   0.062
+  ],
+  "Paper": [
+   1.9,
+   0.03,
+   0.31,
+   0.022
+  ],
+  "Vignette": [
+   0.2
+  ],
+  "Gamma": [
+   0.92
+  ],
+  "FlakeScale": [
+   23.0,
+   58.0
+  ],
+  "FlakeDens": [
+   0.72,
+   0.8
+  ],
+  "FlakeRad": [
+   0.165,
+   0.09
+  ],
+  "FlakeAlpha": [
+   0.66,
+   0.2
+  ],
+  "FlakeSpeed": [
+   11.0,
+   24.0
+  ],
+  "FlakeStretch": [
+   2.9,
+   1.5
+  ],
+  "FlakeMin": [
+   0.8
+  ],
+  "FlakeCol": [
+   0.985,
+   0.99,
+   1.0
+  ],
+  "FlakeDir": [
+   -0.8,
+   -1.0
+  ],
+  "Key": [
+   -0.34,
+   0.6,
+   0.72
+  ],
+  "Bounce": [
+   0.3,
+   -0.8,
+   -0.52
+  ],
+  "LitMix": [
+   0.1,
+   0.92,
+   0.52,
+   0.085
+  ],
+  "Penumbra": [
+   11.0
+  ],
+  "RimPow": [
+   1.9,
+   0.7
+  ]
+ },
+ "pal": {
+  "10": [
+   [
+    0.495,
+    0.56,
+    0.69
+   ],
+   [
+    0.735,
+    0.78,
+    0.86
+   ],
+   [
+    0.97,
+    0.975,
+    0.985
+   ]
+  ],
+  "11": [
+   [
+    0.212,
+    0.22,
+    0.248
+   ],
+   [
+    0.33,
+    0.342,
+    0.376
+   ],
+   [
+    0.468,
+    0.482,
+    0.516
+   ]
+  ],
+  "12": [
+   [
+    0.086,
+    0.094,
+    0.116
+   ],
+   [
+    0.128,
+    0.138,
+    0.164
+   ],
+   [
+    0.18,
+    0.192,
+    0.22
+   ]
+  ],
+  "13": [
+   [
+    0.094,
+    0.1,
+    0.118
+   ],
+   [
+    0.168,
+    0.178,
+    0.202
+   ],
+   [
+    0.262,
+    0.274,
+    0.302
+   ]
+  ],
+  "14": [
+   [
+    0.33,
+    0.372,
+    0.452
+   ],
+   [
+    0.47,
+    0.51,
+    0.58
+   ],
+   [
+    0.61,
+    0.648,
+    0.706
+   ]
+  ],
+  "15": [
+   [
+    0.78,
+    0.66,
+    0.42
+   ],
+   [
+    0.88,
+    0.78,
+    0.54
+   ],
+   [
+    0.96,
+    0.89,
+    0.68
+   ]
+  ],
+  "16": [
+   [
+    0.56,
+    0.556,
+    0.57
+   ],
+   [
+    0.79,
+    0.792,
+    0.806
+   ],
+   [
+    0.935,
+    0.94,
+    0.95
+   ]
+  ],
+  "17": [
+   [
+    0.075,
+    0.098,
+    0.122
+   ],
+   [
+    0.14,
+    0.18,
+    0.215
+   ],
+   [
+    0.235,
+    0.3,
+    0.35
+   ]
+  ],
+  "18": [
+   [
+    0.05,
+    0.048,
+    0.058
+   ],
+   [
+    0.072,
+    0.07,
+    0.082
+   ],
+   [
+    0.1,
+    0.098,
+    0.112
+   ]
+  ],
+  "19": [
+   [
+    0.17,
+    0.132,
+    0.116
+   ],
+   [
+    0.285,
+    0.228,
+    0.202
+   ],
+   [
+    0.42,
+    0.348,
+    0.312
+   ]
+  ],
+  "20": [
+   [
+    0.93,
+    0.94,
+    0.955
+   ],
+   [
+    0.965,
+    0.97,
+    0.98
+   ],
+   [
+    1.0,
+    1.0,
+    1.0
+   ]
+  ]
+ },
+ "claims": {
+  "note": "What this style promises, and the number that says whether it kept the promise. A claim is part of the style, not part of the renderer: thick air and ink that thins into it are decisions this style made, and another style is free to decide otherwise.",
+  "horizonStep": [
+   "<",
+   6.0,
+   "levels: ground and sky meet without an edge"
+  ],
+  "groundTone": [
+   ">",
+   40.0,
+   "levels between road and snow"
+  ],
+  "inkFade": [
+   ">",
+   2.0,
+   "near ink over far ink, once content is divided out"
+  ],
+  "snowFalls": [
+   ">",
+   1.5,
+   "% of wall pixels the weather moves in one held drawing"
+  ]
+ }
+}

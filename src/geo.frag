@@ -21,6 +21,7 @@ uniform float uScene;  // 0 the empty field, 1 the street
 uniform float uCell;   // how tightly the street is packed -- for the cost experiment
 uniform float uNbr;
 uniform float uProbe;   // 1: map() calls   2: primitive evaluations
+__STYLEDECL__
 uniform float uWalkDir;  // +1 the world comes to him, -1 the known-bad
 uniform float uRimGate; // 1 a floor has no silhouette, 0 the old ungated rim
 uniform float uBound;   // 1: use the cheap bounds  0: the known-bad, to measure them
@@ -258,8 +259,10 @@ void main(){
   gA=vec4(nearT,0.0,0.0,near); gB=vec4(0.5,0.5,0.5,0.0); return;
  }
  vec3 p=ro+rd*t, n=calcN(p);
- vec3 L =normalize(vec3(-0.34,0.60, 0.72));
- vec3 B =normalize(vec3( 0.30,-0.80,-0.52));
+ /* The lighting model had leaked into pass one, which is supposed to decide nothing
+    about how anything looks. It is style wherever it sits, so it is in the document. */
+ vec3 L =normalize(sKey);
+ vec3 B =normalize(sBounce);
  float dif=max(dot(n,L),0.0);
  /* SHADOW ACNE, ON SNOW. A fixed 12mm lift off the surface is enough when a pixel
     is a few millimetres across and the surface is smooth, and not enough on a drift
@@ -267,11 +270,11 @@ void main(){
     their own ground and report a hit. On a white field lit from one side that came
     out as a fine dotted stipple across the whole near ground. The lift has to be a
     pixel's worth of surface, so it scales with the footprint. */
- float sh =shadow(p+n*(0.012+GFP*5.0),L,11.0);
+ float sh =shadow(p+n*(0.012+GFP*5.0),L,sPenumbra);
  float occ=ao(p,n);
  float bnc=max(dot(n,B),0.0);
  float sky=0.5+0.5*n.y;
- float lit=dif*mix(0.10,1.0,sh)*0.92 + bnc*0.52 + sky*0.085;
+ float lit=dif*mix(sLitMix.x,1.0,sh)*sLitMix.y + bnc*sLitMix.z + sky*sLitMix.w;
  /* RIM IS A SILHOUETTE EFFECT, AND A FLOOR HAS NO SILHOUETTE. Without the last
     factor this term read (1 - n.dot(-rd)) as "the surface is turning away from me",
     which is true of a shoulder and false of a road: a ground plane is grazing
@@ -279,7 +282,7 @@ void main(){
     that tops out at 1.0. The road material was authored at 0.61 and measured at 255.
     Fifteen per cent of every street frame was a road that had been erased, and the
     other white half of the picture was snow that had been erased with it. */
- float rim=pow(clamp(1.0-dot(n,-rd),0.0,1.0),1.9)*pow(max(dot(n,L),0.0),0.7)
+ float rim=pow(clamp(1.0-dot(n,-rd),0.0,1.0),sRimPow.x)*pow(max(dot(n,L),0.0),sRimPow.y)
           *(1.0-uRimGate*n.y*n.y*clamp(n.y,0.0,1.0));   // uRimGate 0 restores the known-bad
  /* ===== R4. THE FACE =====
     An eye is not geometry. Modelled as a ball in a socket it costs every ray every

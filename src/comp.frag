@@ -17,14 +17,15 @@ uniform float uLineFar;    // 1 ink thins with distance, 0 the old full-strength
 uniform vec3 uRo;          // the same camera pass one used, for the slope test
 uniform vec3 uTa;
 uniform float uFoc;
+__STYLEDECL__
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float vnoise(vec2 p){
  vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
             mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
 }
-const vec3 SKY=vec3(0.895,0.912,0.930);
-const vec3 INK=vec3(0.055,0.060,0.078);
+/* SKY and INK used to be consts here. They are style now, like everything else in
+   this pass: see src/styles/. */
 
 void main(){
  ivec2 ip=ivec2(gl_FragCoord.xy);
@@ -49,7 +50,7 @@ void main(){
  vec3 fw=normalize(uTa-uRo), rgt=normalize(cross(vec3(0,1,0),fw)), upv=cross(fw,rgt);
  vec3 rd=normalize(uv.x*rgt+uv.y*upv+uFoc*fw);
  float face=max(abs(dot(n,rd)),0.12);             // 1 = flat on, 0 = edge on
- float dTol=0.0075/face;                          // what this surface may legitimately do
+ float dTol=sInkDepthTol/face;                          // what this surface may legitimately do
 
  float dEdge=0.0, nEdge=0.0, mEdge=0.0, curv=0.0;
  const ivec2 OFF[4]=ivec2[4](ivec2(1,0),ivec2(-1,0),ivec2(0,1),ivec2(0,-1));
@@ -76,14 +77,14 @@ void main(){
  }
  /* and keep it crisp. A half-strength line spread over a wide band is not a line,
     it is a smudge -- it darkens without separating, which is the opposite of the job. */
- float line=uLines*max(smoothstep(1.35,2.20,dEdge),
-            max(smoothstep(0.40,0.62,nEdge), mEdge));
+ float line=uLines*max(smoothstep(sInkDepthEdge.x,sInkDepthEdge.y,dEdge),
+            max(smoothstep(sInkNormalEdge.x,sInkNormalEdge.y,nEdge), mEdge));
  line=line*line*(3.0-2.0*line);
 
  vec3 col;
  if(mat<0.5){
   float h=clamp(uv.y*1.4+0.5,0.0,1.0);
-  col=mix(SKY*0.985,SKY*1.01,h);
+  col=mix(sSky*sSkyGrad.x,sSky*sSkyGrad.y,h);
  }else{
   float lit=A.r, occ=A.g, rim=A.b;
 
@@ -99,35 +100,26 @@ void main(){
   /* The stretch is the whole trick. Sampled isotropically the break comes out as
      blotches -- dirt, not brushwork. Stretched hard ALONG the form and left fine
      ACROSS it, the same noise becomes strokes that follow the surface. */
-  vec2 bq=vec2(dot(sp,tg), dot(sp,d2)*13.0);
-  float brush=(vnoise(bq*85.0)-0.5)*0.70
-             +(vnoise(bq*240.0)-0.5)*0.34;
-  float amp=mix(0.008,0.054,clamp(curv*2.6,0.0,1.0));
+  vec2 bq=vec2(dot(sp,tg), dot(sp,d2)*sBrushStretch);
+  float brush=(vnoise(bq*sBrushOct.x)-0.5)*sBrushOct.y
+             +(vnoise(bq*sBrushOct.z)-0.5)*sBrushOct.w;
+  float amp=mix(sBrushAmp.x,sBrushAmp.y,clamp(curv*sBrushCurv,0.0,1.0));
   /* THE RIM HAS TO BE BANDED TOO. Added after the quantiser it was a smooth
      gradient laid over flat cel tones, which is what made a wool hood read as wet
      vinyl: the one continuous shading term in a picture made of hard steps reads as
      a specular highlight, and the eye believes the gradient over the bands. Folded
      into q it becomes a drawn light edge with an edge of its own. */
-  float q=lit+brush*amp+rim*1.05*uRimOld;
+  float q=lit+brush*amp+rim*sRim.x*uRimOld;
 
   int mi=int(mat+0.5);
   /* drawn marks are drawn: they do not take a light band, or the lash disappears
      wherever the light happens to fall on it */
   bool drawnMark = (mi>=16&&mi<=20);
-  float band = drawnMark ? (lit>0.30?2.0:1.0)
-             : smoothstep(0.208,0.228,q)+smoothstep(0.455,0.475,q);
+  float band = drawnMark ? (lit>sDrawnLit?2.0:1.0)
+             : smoothstep(sBand.x,sBand.y,q)+smoothstep(sBand.z,sBand.w,q);
   vec3 c0,c1,c2;
-  if(mi==10){ c0=vec3(0.495,0.560,0.690); c1=vec3(0.735,0.780,0.860); c2=vec3(0.970,0.975,0.985); }   // snow
-  else if(mi==14){ c0=vec3(0.330,0.372,0.452); c1=vec3(0.470,0.510,0.580); c2=vec3(0.610,0.648,0.706); } // road
-  else if(mi==11){ c0=vec3(0.212,0.220,0.248); c1=vec3(0.330,0.342,0.376); c2=vec3(0.468,0.482,0.516); } // wall
-  else if(mi==12){ c0=vec3(0.086,0.094,0.116); c1=vec3(0.128,0.138,0.164); c2=vec3(0.180,0.192,0.220); } // dark window
-  else if(mi==13){ c0=vec3(0.094,0.100,0.118); c1=vec3(0.168,0.178,0.202); c2=vec3(0.262,0.274,0.302); } // metal
-  else if(mi==15){ c0=vec3(0.780,0.660,0.420); c1=vec3(0.880,0.780,0.540); c2=vec3(0.960,0.890,0.680); } // a light that is on
-  else if(mi==16){ c0=vec3(0.560,0.556,0.570); c1=vec3(0.790,0.792,0.806); c2=vec3(0.935,0.940,0.950); } // the white of an eye
-  else if(mi==17){ c0=vec3(0.075,0.098,0.122); c1=vec3(0.140,0.180,0.215); c2=vec3(0.235,0.300,0.350); } // iris
-  else if(mi==18){ c0=vec3(0.050,0.048,0.058); c1=vec3(0.072,0.070,0.082); c2=vec3(0.100,0.098,0.112); } // the drawn line
-  else if(mi==19){ c0=vec3(0.170,0.132,0.116); c1=vec3(0.285,0.228,0.202); c2=vec3(0.420,0.348,0.312); } // the shadow that is a nose
-  else if(mi==20){ c0=vec3(0.930,0.940,0.955); c1=vec3(0.965,0.970,0.980); c2=vec3(1.000,1.000,1.000); } // the catchlight
+  int pi=(mi-10)*3;
+  if(mi>=10&&mi<=20){ c0=sPal[pi]; c1=sPal[pi+1]; c2=sPal[pi+2]; }
   else { int b=(mi<=6? mi-1 : mi-21+6)*3; c0=RAMP[b]; c1=RAMP[b+1]; c2=RAMP[b+2]; }
   vec3 base = band<0.5 ? c0 : (band<1.5 ? c1 : c2);
 
@@ -136,16 +128,16 @@ void main(){
      it -- but crushed to a fortieth of its tone it stops being skin and becomes a
      hole. Snow throws a great deal of light back up into exactly this cavity. */
   bool faceish = (mi==3)||(mi==23)||drawnMark;
-  base *= mi==15 ? 1.0 : (faceish ? mix(0.94,1.0,occ) : mix(0.88,1.0,occ));
-  if(mi==3||mi==23) base += vec3(0.085,0.070,0.062)*(0.35+0.65*occ);   // snow bounce, into the hood
-  base += (0.5+0.5*n.y)*0.045*vec3(0.74,0.82,1.0);
-  base += mix(rim*2.10, rim*rim*0.50, uRimOld)*vec3(1.0,0.980,0.94);   // the last sliver of the edge
-  if(mi!=15) base *= faceish ? mix(0.80,1.0,smoothstep(0.12,0.42,occ))
-                             : mix(0.42,1.0,smoothstep(0.30,0.46,occ));
+  base *= mi==15 ? 1.0 : (faceish ? mix(sOccFace.x,1.0,occ) : mix(sOcc.x,1.0,occ));
+  if(mi==3||mi==23) base += sHoodBounce*(0.35+0.65*occ);   // snow bounce, into the hood
+  base += (0.5+0.5*n.y)*sSkyFill*sSkyFillCol;
+  base += mix(rim*2.10, rim*rim*sRim.y, uRimOld)*vec3(1.0,0.980,0.94);   // the last sliver of the edge
+  if(mi!=15) base *= faceish ? mix(sOccFace.y,1.0,smoothstep(sOccFace.z,sOccFace.w,occ))
+                             : mix(sOcc.y,1.0,smoothstep(sOcc.z,sOcc.w,occ));
   col=base;
   /* aerial perspective: in a whiteout the far end of a street is the sky */
-  float far=1.0-exp(-mix(0.0105,0.0016,uScene)*t*t);
-  col=mix(col,SKY,uFog*far);
+  float far=1.0-exp(-mix(sFog.x,sFog.y,uScene)*t*t);
+  col=mix(col,sSky,uFog*far);
 
   /* the line is drawn last and takes the ground's own darkness with it, so it reads
      as ink on that surface rather than a black wire laid over the picture.
@@ -157,7 +149,7 @@ void main(){
      building reports an edge. The far end of the street was not fading into weather,
      it was dissolving into black speckle. An artist draws fewer lines on far things;
      this is that, as one multiply. */
-  col=mix(col, min(col*0.26,INK), line*0.88*(1.0-0.90*far*uLineFar));
+  col=mix(col, min(col*sInkFloor,sInk), line*sInkStrength*(1.0-sInkFade*far*uLineFar));
  }
 
  /* the contour: a ray that came close and missed was grazing the silhouette */
@@ -165,8 +157,8 @@ void main(){
   /* a contour drawn at full strength on something forty units away is a black line
      hanging in fog that already swallowed the building it belongs to */
   float lineS=1.0-smoothstep(0.0004,0.0022,A.a);
-  float nfog=1.0-exp(-mix(0.0105,0.0016,uScene)*A.r*A.r);
-  col=mix(col,INK,lineS*0.95*(1.0-nfog*uLineFar));
+  float nfog=1.0-exp(-mix(sFog.x,sFog.y,uScene)*A.r*A.r);
+  col=mix(col,sInk,lineS*sContour*(1.0-nfog*uLineFar));
  }
 
  /* ===== THE AIR =====
@@ -183,23 +175,23 @@ void main(){
     minimum screen footprint and its opacity divided by the area it gained -- which
     is what an anti-aliased sample would have returned anyway. */
  float snowT = uSnow>0.5 ? iTime : 0.0;
- vec2 fall=normalize(vec2(-0.80,-1.0));
+ vec2 fall=normalize(sFlakeDir);
  vec2 across=vec2(-fall.y,fall.x);
  for(int L2=0;L2<3;L2++){
   float fl=float(L2)/2.0;
-  float sc=mix(23.0,58.0,fl);
-  vec2 q2=sp*sc - fall*snowT*mix(11.0,24.0,fl);
+  float sc=mix(sFlakeScale.x,sFlakeScale.y,fl);
+  vec2 q2=sp*sc - fall*snowT*mix(sFlakeSpeed.x,sFlakeSpeed.y,fl);
   vec2 ci=floor(q2), cf=fract(q2);
-  if(hash(ci+fl*74.0)>mix(0.72,0.80,fl)){
+  if(hash(ci+fl*74.0)>mix(sFlakeDens.x,sFlakeDens.y,fl)){
    vec2 c2=vec2(hash(ci+7.0),hash(ci+19.0));
    vec2 d0=cf-c2;
-   vec2 dv=vec2(dot(d0,across)*mix(2.9,1.5,fl), dot(d0,fall));  // the streak lies along the fall
-   float rad=mix(0.165,0.090,fl);
+   vec2 dv=vec2(dot(d0,across)*mix(sFlakeStretch.x,sFlakeStretch.y,fl), dot(d0,fall));  // the streak lies along the fall
+   float rad=mix(sFlakeRad.x,sFlakeRad.y,fl);
    /* never finer than most of a pixel: grow it, and pay for the area in opacity */
-   float k=max(1.0, (0.80/iRes.y)/(rad/sc));
+   float k=max(1.0, (sFlakeMin/iRes.y)/(rad/sc));
    rad*=k;
-   float fa=smoothstep(rad,0.0,length(dv))*mix(0.66,0.20,fl)/(k*k);
-   col=mix(col,vec3(0.985,0.990,1.0),fa);
+   float fa=smoothstep(rad,0.0,length(dv))*mix(sFlakeAlpha.x,sFlakeAlpha.y,fl)/(k*k);
+   col=mix(col,sFlakeCol,fa);
   }
  }
  if(uDebug>0.5){
@@ -219,8 +211,8 @@ void main(){
   return; }
 
  vec2 g=gl_FragCoord.xy;
- col+=(vnoise(g*1.9)-0.5)*0.030 + (vnoise(g*0.31)-0.5)*0.022;
- col*=1.0-0.20*pow(length(uv*vec2(0.86,1.0)),2.3);
- col=pow(clamp(col,0.0,1.0),vec3(0.92));
+ col+=(vnoise(g*sPaper.x)-0.5)*sPaper.y + (vnoise(g*sPaper.z)-0.5)*sPaper.w;
+ col*=1.0-sVignette*pow(length(uv*vec2(0.86,1.0)),2.3);
+ col=pow(clamp(col,0.0,1.0),vec3(sGamma));
  O=vec4(col,1.0);
 }

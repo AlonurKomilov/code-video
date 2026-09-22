@@ -99,3 +99,49 @@ frame taken from the surface normal, so it wraps instead of being projected flat
 **Do not decode one value in two places.** `mat` moved to a new divisor; the
 neighbour's `m2` did not. Every pixel then compared 3 against 1.5 and the line was
 drawn over 99.3% of the face. Invisible by eye — the face just looked dark.
+
+## Style is a layer, and it has a boundary you can measure
+
+The renderer drew this line for itself before anyone went looking for it: **pass one
+writes what was MEASURED about a surface and decides nothing about how it looks; pass
+two settles the look.** So the style *is* pass two — plus the lighting model, which had
+leaked into pass one and is a look decision wherever it sits. `src/styles/` holds those
+decisions: 40 numbers and 33 palette slots per style, in a file.
+
+Writing it down is not tidiness. **A style boundary you have never crossed is not a
+boundary, it is a folder.** So there are two styles, and three things have to be true
+between them:
+
+| | measured | broken case |
+|---|---|---|
+| a style may not move a single edge | 0.000% of the material buffer | 14.906% |
+| nor a single distance | 0.000% of the depth buffer | 33.422% |
+| and it has to actually be a second style | 28.077 mean levels apart | 0.000 against itself |
+
+The broken case for the first two is a "style" that also respaces the street by half a
+metre — a world change wearing a look. If a look can do that, it was never a look.
+
+**Three layers, and the test that tells them apart:**
+
+- **A style** changes every tone and moves no edge. Measurable, above. `oq-qalam`
+  (brush, paper, thick air), `tekis-cel` (flat fills, no grain, thin air).
+- **A technique** is one way of making a mark, which a style switches on and sets:
+  the painted terminator, interior line art, paper grain, ink that thins with
+  distance, the flake layers. Today these are parameters a style can zero. A style
+  that needs a mark this renderer cannot make — a halftone screen, a wet edge, a cut
+  block — needs new code in pass two, not a new file.
+- **The film** is geometry, characters, the exposure sheet, the cameras, the sound.
+  If changing the style changes any of it, what changed was the film.
+
+**And each style carries its own numbers.** This is what makes two styles different
+rather than one style recoloured. Thick air and ink that thins into it are decisions
+`oq-qalam` made, so it must meet a horizon step under 6 levels and thin its ink by more
+than 2×. `tekis-cel` decided otherwise — a flat background may show a horizon and may
+keep its outlines — so it is held to under 20 and more than 1.15×. The threshold is
+part of the style, and **a looser claim is still a claim**: every one of them is
+measured against the same deliberately broken render and has to reject it.
+
+The extraction itself was checked the same way. Moving 40 constants out of two shaders
+and into a document moved **one pixel by one level, in each of two frames**, out of
+41,520 — the signature of a compiler that can no longer constant-fold, not of a wrong
+number. A wrong number shows on every pixel of its material.
