@@ -10,6 +10,10 @@
  ],
  "kadr": {
   "fayl": "../../oq-kocha/build/oq-kocha.html",
+  "qurish": {
+   "papka": "../../oq-kocha",
+   "buyruq": "npm run build"
+  },
   "kadrlar": [
    36,
    300,
@@ -111,7 +115,7 @@
   "chizilganlik": 26.8,
   "tekstura": 4.02,
   "siyoh": 8.4
- },
+ }, 
  "maqsadlar": {
   "tekstura": [
    ">",

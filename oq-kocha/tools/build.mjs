@@ -2,7 +2,8 @@
    A character is a JSON document. This turns it into GLSL. Nothing about the
    hooded man is in this file and nothing about GLSL is in his -- which is the
    whole point: the next character is a new document, not a new shader. */
-import {readFileSync, writeFileSync} from 'fs';
+import {readFileSync, writeFileSync, mkdirSync} from 'fs';
+import {dirname} from 'path';
 
 const JOINT = {hip:0, shoulder:1, head:2, neck:3,
  'knee.n':4,'ankle.n':5,'toe.n':6,'elbow.n':7,'hand.n':8,
@@ -119,6 +120,10 @@ if(args.length){
   ' return b.x<a.x? b : a;',
   '}'].join('\n');
  frag=frag.replace('//#CHARACTER_MAP',fns+'\n'+disp);
+ /* BUILD/ REPO'DA SAQLANMAYDI, ya'ni toza checkout'da bu papka yo'q. Bu qatorsiz
+    qurish birinchi yozishdayoq ENOENT bilan yiqilardi, va CI hech qachon
+    toza holatdan filmni qura olmasdi. */
+ mkdirSync(dirname(outPath),{recursive:true});
  writeFileSync(outPath,frag);
  /* 12 palette slots: 1-6 for the first character, 21-26 for the second */
  const ramp=[];
