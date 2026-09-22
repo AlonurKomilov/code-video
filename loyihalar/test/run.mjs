@@ -4,8 +4,9 @@
    hech narsani ushlab turmaydigan tekshiruv -- eng yomon tekshiruv, chunki u
    ishonch beradi va hech narsa qaytarmaydi. */
 import {check,report} from './lib.mjs';
-import {load,verify,tasdiq,MAYDONLAR} from '../tools/karta.mjs';
+import {load,verify,tasdiq,tayyorla,yoq,MAYDONLAR} from '../tools/karta.mjs';
 import {grab,metrics} from '../tools/olchov.mjs';
+import {rmSync} from 'fs';
 const K=load();
 const yol=(k,p)=>new URL(p,'file://'+k._f).pathname;
 const t0=Date.now();
@@ -30,6 +31,28 @@ await check({name:'karta/sanoq-bilan-mos', unit:'eskirgan uslub satri',
   const u=K[0].uslub[1];
   return tasdiq(u.gap.replace(/\d+/,'999'), K[0].sanoq.jadvallar.SHOTS).ok? 0 : 1; },
  note:'har uslub satri sanoqdagi bitta qiymatga bog\'langan va u qiymat satrda turishi shart'});
+
+/* ===== QURISH ZANJIRI =====
+   Kartaning kadri manbada turmasligi mumkin: Oq Ko'chaning sahifasi quriladi va
+   build/ .gitignore da. Bu tekshiruv aynan CI da bo'lgan xatoni yozadi -- o'sha
+   ish filmni qurmasdan uning qurilgan sahifasini o'lchamoqchi bo'lgan, ya'ni
+   hech qachon o'ta olmasdi.
+
+   Kalibratsiya qurishsiz holat: sahifa o'chiriladi va QURILMAYDI. Agar shunda ham
+   "hammasi joyida" chiqsa, tekshiruv o'zi qarayotgan xatoni ko'rmayapti degani.
+   Ikkala tarmoq ham oxirida sahifani qaytarib quradi, chunki keyingi tekshiruvlar
+   o'sha fayldan kadr oladi. */
+const QUR=K.filter(k=>k.kadr?.qurish);
+await check({name:'kadr/qurish-zanjiri', unit:'qurishdan keyin yo\'q sahifa',
+ measure:()=>{ QUR.forEach(k=>rmSync(yol(k,k.kadr.fayl),{force:true}));
+               tayyorla(QUR);
+               return yoq(QUR).length; },
+ pass:v=>v===0,
+ calibrate:()=>{ QUR.forEach(k=>rmSync(yol(k,k.kadr.fayl),{force:true}));
+                 const n=yoq(QUR).length;
+                 tayyorla(QUR);                       // keyingi tekshiruvlar uchun qaytariladi
+                 return n; },
+ note:`${QUR.length} karta o'z kadrini quradi: `+QUR.map(k=>`${k.nom} (${k.kadr.qurish.buyruq})`).join(', ')});
 
 /* ===== O'LCHOV TOOLINING O'ZI HAM KALIBRLANADI =====
    Ikkala tekshiruv ham BITTA olishdan hisoblanadi. Avvalgi variant o'lchovni besh
