@@ -1,0 +1,79 @@
+<!doctype html><html lang="uz"><head><meta charset="utf-8">
+<title>Zarra qatlami</title>
+<style>
+ html,body{margin:0;height:100%;background:#0b0a14;display:grid;place-items:center}
+ canvas{image-rendering:pixelated;box-shadow:0 0 0 1px #221f33}
+</style></head><body><canvas id="c" width="540" height="304"></canvas><script>
+/* ===== ZARRA QATLAMI =====
+   Har son o'lchangan, o'ylab topilmagan. Manba: misol GIF (540x304, 22 tasvir,
+   har biri 60 ms), va uning zarra qatlami seldan ayirib olinib o'lchangan:
+
+     yaqin qatlam  +5,-2 px/kadr   moslik 0.79  (katta, yumshoq zarra)
+     uzoq qatlam   +1,-1 px/kadr   moslik 0.24  (mayda, aniq zarra)
+     bo'laklar     1483 ta/tasvir: 76% 1-3 px, 21% 4-12 px, 3% 13-40 px, 0.5% kattaroq
+     yorqin piksel kadrning 3.8% i
+
+   SEL QIMIRLAMAYDI. Misolda har kadr ichida eng yaxshi siljish (0,0) edi -- kamera
+   ham, personaj ham. Ya'ni tiriklikni chizma emas, shu qatlam olib yuradi, va
+   shuning uchun bu fayl chizmani bilmaydi: u faqat zarrani biladi. */
+const W=540,H=304, MS=60;                       // o'lchangan: 60 ms/tasvir
+
+/* Deterministik: bir xil kadr har safar bir xil chiqishi shart, aks holda
+   o'lchov o'lchov emas. */
+function rng(s){return function(){s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296;}}
+
+const QATLAM=[
+ /* uzoq: mayda va aniq, sekin. Soni maydalar ulushidan: 1483*0.76 ~ 1127 */
+ {n:1127, v:[ 1,-1], r:[0.5,1.6], a:[0.35,0.95], yum:0},
+ /* yaqin: kattaroq va yumshoq, ~3.5 barobar tez */
+ {n: 309, v:[ 5,-2], r:[1.4,2.6], a:[0.30,0.80], yum:1},
+ {n:  41, v:[ 5,-2], r:[2.6,4.0], a:[0.20,0.55], yum:2},
+ {n:   8, v:[ 5,-2], r:[4.5,8.0], a:[0.08,0.22], yum:3},
+];
+const P=QATLAM.map((q,qi)=>{
+ const R=rng(1013+qi*7919), a=[];
+ for(let i=0;i<q.n;i++) a.push({x:R()*W, y:R()*H, r:q.r[0]+R()*(q.r[1]-q.r[0]),
+                                al:q.a[0]+R()*(q.a[1]-q.a[0])});
+ return a;
+});
+const g=document.getElementById('c').getContext('2d');
+
+/* ATAYLAB BUZISH UCHUN ESHIK. Tekshiruv kalibratsiyasi shu yerdan o'tadi: ikkala
+   qatlamni bir xil tezlikka qo'yib, "qatlamlarni ajratadi" degan da'voni sinaydi.
+   Eshiksiz kalibratsiya yozib bo'lmaydi, kalibratsiyasiz tekshiruv esa raqam. */
+let USTUN=null;
+window.__opt=o=>{ USTUN=o||null; };
+window.__resetOpt=()=>{ USTUN=null; };
+const tezlik=qi=>(USTUN&&USTUN['v'+qi])||QATLAM[qi].v;
+
+function osmon(){                                // tekis fon: zarra ko'rinishi uchun
+ const gr=g.createLinearGradient(0,0,W*0.6,H);
+ gr.addColorStop(0,'#141129'); gr.addColorStop(1,'#090813');
+ g.fillStyle=gr; g.fillRect(0,0,W,H);
+}
+/* HAR KADR BUTUN SONGA SURILADI, chunki o'lchov butun songa qaraydi: 5.39 px/kadr
+   deb yozib, keyin 5.4 ni o'lchab olish -- o'zini aldash. */
+function kadr(n){
+ osmon();
+ g.globalCompositeOperation='lighter';
+ for(let qi=0;qi<QATLAM.length;qi++){
+  const q=QATLAM[qi];
+  for(const p of P[qi]){
+   const v=tezlik(qi);
+   const x=((p.x+v[0]*n)%W+W)%W, y=((p.y+v[1]*n)%H+H)%H;
+   if(q.yum===0){ g.fillStyle=`rgba(226,232,255,${p.al})`; g.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(p.r)),Math.max(1,Math.round(p.r))); }
+   else{
+    const gr=g.createRadialGradient(x,y,0,x,y,p.r*2.2);
+    gr.addColorStop(0,`rgba(232,238,255,${p.al})`); gr.addColorStop(1,'rgba(232,238,255,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(x,y,p.r*2.2,0,6.2832); g.fill();
+   }
+  }
+ }
+ g.globalCompositeOperation='source-over';
+ return {kadr:n, ms:n*MS};
+}
+window.__frameTo=kadr;                           // o'lchov shu ilmoqdan kadr oladi
+let t=0, oxirgi=0;
+function yur(ts){ if(ts-oxirgi>=MS){ oxirgi=ts; kadr(t++); } requestAnimationFrame(yur); }
+kadr(0); requestAnimationFrame(yur);
+</script></body></html>

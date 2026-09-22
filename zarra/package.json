@@ -1,0 +1,3 @@
+{ "name":"zarra","type":"module","private":true,
+  "scripts":{"audit":"node test/run.mjs"},
+  "devDependencies":{"playwright":"^1.47.0"} }
