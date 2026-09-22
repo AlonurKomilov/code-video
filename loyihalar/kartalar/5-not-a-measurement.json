@@ -1,0 +1,128 @@
+{
+ "nom": "Not A Measurement",
+ "manba": [
+  "../../not-a-measurement.html"
+ ],
+ "kadr": {
+  "fayl": "../../not-a-measurement.html",
+  "kadrlar": [
+   5,
+   12,
+   20
+  ]
+ },
+ "uslub": [
+  {
+   "gap": "8 kesim: 3 · 2,4 · 0,3 · 0,25 · 2,45 · 2,8 · 1,4 · 4,2 s — ikkitasi choraksoniyalik, zarb uchun.",
+   "dalil": "jadvallar.CUTS"
+  },
+  {
+   "gap": "Butun film 39 chizish buyrug'ida sig'adi: 10 chiziq segmenti (plotter izi) va 9 matn bloki.",
+   "dalil": "chizishJami"
+  },
+  {
+   "gap": "Matn Archivo Black bilan, o'lchov satrlari IBM Plex Mono bilan.",
+   "dalil": "shriftlar"
+  },
+  {
+   "gap": "renderer canvas2d, 508 satr, 21 funksiya, ovoz sintez qilinadi.",
+   "dalil": "satrlar"
+  }
+ ],
+ "stil": "O'lchov varag'i. Pushti grafik qog'oz, qizil plotter izi, yuqorida CHART REC. yozuvi va ishlayotgan soat. Fon emas — asbob: grafik qog'oz sahnaning o'zi.",
+ "davolar": {
+  "qiymat.oraliq": [
+   ">",
+   180,
+   "qog'oz oq, iz qora"
+  ],
+  "chizilganlik": [
+   ">",
+   20,
+   "chizg'ich bilan chizilgan chet qattiq bo'ladi"
+  ]
+ },
+ "sanoq": {
+  "fayllar": 1,
+  "baytlar": 19172,
+  "satrlar": 508,
+  "renderer": "canvas2d",
+  "funksiyalar": 21,
+  "ovoz": true,
+  "hodisalar": [
+   "click"
+  ],
+  "shriftlar": [
+   "Archivo Black",
+   "IBM Plex Mono"
+  ],
+  "chizish": {
+   "beginPath": 7,
+   "moveTo": 10,
+   "lineTo": 10,
+   "arc": 1,
+   "fillRect": 2,
+   "fillText": 9
+  },
+  "chizishJami": 39,
+  "jadvallar": {
+   "CUTS": 8,
+   "STARTS": 1
+  },
+  "davomiyliklar": [
+   3,
+   2.4,
+   0.3,
+   0.25,
+   2.45,
+   2.8,
+   1.4,
+   4.2
+  ]
+ },
+ "olchov": {
+  "palitra": [
+   {
+    "hex": "#f7e6e1",
+    "ulush": 50
+   },
+   {
+    "hex": "#f6e4df",
+    "ulush": 25
+   },
+   {
+    "hex": "#f5dfd9",
+    "ulush": 12.5
+   },
+   {
+    "hex": "#352d2b",
+    "ulush": 6.3
+   },
+   {
+    "hex": "#d6938b",
+    "ulush": 3.1
+   },
+   {
+    "hex": "#f2dad4",
+    "ulush": 3.1
+   }
+  ],
+  "qiymat": [
+   18,
+   233
+  ],
+  "toyinganlik": 11.5,
+  "qattiqChet": 6.42,
+  "yumshoqChet": 7.58,
+  "chizilganlik": 45.9,
+  "tekstura": 4.73,
+  "siyoh": 4
+ },
+ "maqsadlar": {
+  "tekstura": [
+   ">",
+   5.5,
+   "hozir 4,73 — asbob detali yetishmaydi"
+  ]
+ }
+}
