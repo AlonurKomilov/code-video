@@ -1,9 +1,20 @@
 /* Checks that need the renderer. Each one still carries its known-bad case. */
 import {check} from './lib.mjs';
-import {pixels,timed,matOf,CHARACTER,open,close} from './browser.mjs';
+import {pixels,matOf,CHARACTER,open,close} from './browser.mjs';
 import {SHOTS,STARTS} from '../src/shots.mjs';
 import {FPS} from '../src/sheet.mjs';
 const W=200,H=144;   // small on purpose: every check here is a ratio or a count, not a look
+
+/* ===== ISH HAJMI: PRIMITIV SANOG'I, SOAT EMAS =====
+   Renderer har nurda nechta primitivni tekshirganini 3-kanalga yozadi, va shu
+   son mashinaga bog'liq emas -- qaysi kompyuterda yursa ham bir xil chiqadi.
+   To'yingan zond o'lchov emas: agar piksel 255 ga tirralsa, nisbat "kamida
+   shuncha" degan pol bo'lib qoladi, shuning uchun to'yinish xato beradi. */
+const prim=async(frame,opt,wmax)=>{
+ const p=await pixels(frame,W,H,{...opt,wmax},3); let s=0,sat=0;
+ for(let k=0;k<W*H;k++){ s+=p[k*4]; if(p[k*4]>=255) sat++; }
+ if(sat>W*H*0.001) throw new Error(`work probe saturated on ${sat} pixels at ${wmax} full scale`);
+ return wmax*(s/(W*H))/255;};
 const diff=(a,b)=>{let n=0;for(let k=0;k<a.length;k+=4)
  if(a[k]!==b[k]||a[k+1]!==b[k+1]||a[k+2]!==b[k+2])n++; return n/(a.length/4);};
 
@@ -21,18 +32,26 @@ await check({name:'street-fold', unit:'fraction of pixels',
  calibrate:async()=>diff(await pixels(36,W,H,{nbr:1}), await pixels(36,W,H,{nbr:0})),
  note:'omitting the neighbour cells tears holes at every cell seam'});
 
-/* the cost of a folded world does not grow with how much is in it */
-await check({name:'street-cost', unit:'x time for 7.6x buildings',
- measure:async()=>{
-  const a=Math.min(await timed(36,W,H,{cell:6.10}), await timed(36,W,H,{cell:6.10}));
-  const b=Math.min(await timed(36,W,H,{cell:0.80}), await timed(36,W,H,{cell:0.80}));
-  return b/a;},
+/* THE COST OF A FOLDED WORLD DOES NOT GROW WITH HOW MUCH IS IN IT.
+
+   This was wall-clock until CI proved it could not be. The oq-kocha tree was
+   byte-identical across three runs and the job failed once and passed twice; the
+   same job took 43 minutes on one runner and 75 on another, a 1.7x swing in
+   machine speed. Six repeats of the old ratio on an idle box already wandered
+   0.957 to 1.045 against a 1.35 threshold -- and the primitive count gave 0.9823
+   six times out of six, spread exactly zero.
+
+   The lesson was already written down one check below, on bounds-save-work. It
+   had simply never been applied here, and so this check reported the runner's
+   luck and called it the renderer's cost. */
+await check({name:'street-cost', unit:'x primitive evals for 7.6x buildings',
+ measure:async()=>(await prim(36,{cell:0.80},8192))/(await prim(36,{cell:6.10},8192)),
  pass:v=>v<1.35,
- calibrate:async()=>{                       // can this timer see a cost change at all?
-  const a=Math.min(await timed(36,W,H), await timed(36,W,H));
-  const b=Math.min(await timed(36,W*2,H*2), await timed(36,W*2,H*2));
-  return b/a;},
- note:'the calibration doubles the resolution: a timer that cannot see that cannot see anything'});
+ /* Can this probe see a cost difference AT ALL? Turning the bounds off is a cost
+    change the suite has already measured -- if the probe cannot register that,
+    it cannot register anything, and the passing number above means nothing. */
+ calibrate:async()=>(await prim(209,{bound:0},32768))/(await prim(209,{bound:1},4096)),
+ note:'primitive evaluations, not milliseconds: the same number on any machine'});
 
 /* interior line art: ink where forms meet, and nowhere else */
 await check({name:'line-art', unit:'ink valley, levels',
@@ -65,16 +84,11 @@ await check({name:'line-art', unit:'ink valley, levels',
    1122, 1405 and 3234 ms -- so this counts primitive evaluations instead, which is
    exact, repeatable, and the same number on any machine. */
 await check({name:'bounds-save-work', unit:'x fewer primitive evals',
- measure:async()=>{
-  /* A SATURATED PROBE IS NOT A MEASUREMENT. At 4096 full scale the unbounded render
-     pinned 38,458 of 41,520 pixels at white, so the ratio it reported was a floor:
-     whatever the saving really was, this could only ever say "at least". */
-  const prim=async(bound,wmax)=>{
-   const p=await pixels(209,W,H,{bound,wmax},3); let s=0,sat=0;
-   for(let k=0;k<W*H;k++){ s+=p[k*4]; if(p[k*4]>=255) sat++; }
-   if(sat>W*H*0.001) throw new Error(`work probe saturated on ${sat} pixels at ${wmax} full scale`);
-   return wmax*(s/(W*H))/255;};
-  return (await prim(0,32768))/(await prim(1,4096));},
+ /* A SATURATED PROBE IS NOT A MEASUREMENT. At 4096 full scale the unbounded render
+    pinned 38,458 of 41,520 pixels at white, so the ratio it reported was a floor:
+    whatever the saving really was, this could only ever say "at least". That guard
+    now lives in prim() above, which street-cost shares. */
+ measure:async()=>(await prim(209,{bound:0},32768))/(await prim(209,{bound:1},4096)),
  pass:v=>v>1.8,
  calibrate:async()=>1.0,          // bounds on both sides: by construction, no saving
  note:'a bounding sphere for the figure and a slab test for each terrace'});
@@ -92,4 +106,3 @@ for(let i=0;i<SHOTS.length;i++){
   calibrate:()=>area({cam:{ro:[sh.ro[0],sh.ro[1]+9,sh.ro[2]],ta:[sh.ta[0],sh.ta[1]+9,sh.ta[2]],foc:sh.foc}}),
   note:i===0?'counting DARK pixels scored an empty shot higher than a framed one — a wall is darker than two men':undefined});
 }
-

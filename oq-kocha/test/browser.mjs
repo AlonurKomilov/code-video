@@ -17,8 +17,11 @@ let browser=null, page=null;
 export async function open(){
  if(page) return page;
  /* SwiftShader, so the audit runs on a build machine with no GPU at all. It is slow
-    and that is fine: nothing here is measured in absolute milliseconds except the
-    cost check, which is a ratio against itself. */
+    and that is fine, because nothing here is measured in time at all any more. The
+    last wall-clock check -- street-cost -- reported the runner's luck rather than
+    the renderer's cost, and CI caught it: identical source, one failure and two
+    passes, on runners whose speed differed by 1.7x. Work is counted in primitive
+    evaluations now, which is the same number on any machine. */
  const args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--autoplay-policy=no-user-gesture-required'];
  const exe=process.env.QALAM_CHROME || findChrome();
  browser=await chromium.launch(exe?{args,executablePath:exe}:{args});
@@ -45,16 +48,6 @@ export async function pixels(frame,w,h,opt={},mode=0){   // 0 picture 1 material
   window.__resetOpt();
   return Array.from(px);
  },[frame,w,h,opt,mode]));
-}
-export async function timed(frame,w,h,opt={}){
- const pg=await open();
- return await pg.evaluate(([frame,w,h,opt])=>{
-  window.__resetOpt(); window.__opt(opt);
-  const t0=performance.now(); window.__frameTo(frame,w,h);
-  const c=document.querySelector('canvas'), g=c.getContext('webgl2');
-  const px=new Uint8Array(4); g.readPixels(0,0,1,1,g.RGBA,g.UNSIGNED_BYTE,px);  // force the pipe
-  const ms=performance.now()-t0; window.__resetOpt(); return ms;
- },[frame,w,h,opt]);
 }
 export const CHARACTER = m => (m>=1&&m<=6)||(m>=16&&m<=26);
 export const matOf = v => Math.round(v/255*32);
